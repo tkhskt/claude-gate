@@ -20,7 +20,6 @@ import com.tkhskt.claude.notification.popover.PopoverContent
 import com.tkhskt.claude.notification.server.PermissionServer
 import com.tkhskt.claude.notification.theme.AppTheme
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.combine
 import javax.swing.SwingUtilities
 import java.awt.BasicStroke
 import java.awt.Color
@@ -47,7 +46,7 @@ private const val TRAY_ICON_CORNER_RADIUS = 6
 
 private val FILE_EDIT_TOOLS = setOf("Edit", "Write")
 
-private enum class TrayState { IDLE, AWAITING, TIMEOUT }
+private enum class TrayState { IDLE, AWAITING }
 
 @Composable
 fun ApplicationScope.DesktopApp() {
@@ -74,16 +73,11 @@ fun ApplicationScope.DesktopApp() {
     }
 
     // Reflect holder state in the menu bar icon color:
-    // idle = white, awaiting decision = yellow, last request timed out = red.
+    // idle = white, awaiting decision = yellow.
     LaunchedEffect(trayIconRef) {
         val icon = trayIconRef ?: return@LaunchedEffect
-        combine(holder.pending, holder.lastTimeout) { pending, timeout ->
-            when {
-                pending != null -> TrayState.AWAITING
-                timeout != null -> TrayState.TIMEOUT
-                else -> TrayState.IDLE
-            }
-        }.collect { state ->
+        holder.pending.collect { pending ->
+            val state = if (pending != null) TrayState.AWAITING else TrayState.IDLE
             val image = createTrayIconImage(state)
             SwingUtilities.invokeLater { icon.image = image }
         }
@@ -189,7 +183,6 @@ private fun createTrayIconImage(state: TrayState): BufferedImage {
     val background = when (state) {
         TrayState.IDLE -> null                              // transparent
         TrayState.AWAITING -> Color(0xFF, 0xC1, 0x07, 0xFF) // amber 500
-        TrayState.TIMEOUT -> Color(0xEF, 0x44, 0x44, 0xFF)  // red 500
     }
     val foreground = Color(255, 255, 255, 255)
     val image = BufferedImage(TRAY_ICON_WIDTH, TRAY_ICON_HEIGHT, BufferedImage.TYPE_INT_ARGB)

@@ -7,7 +7,6 @@ import com.sun.net.httpserver.HttpServer
 import com.tkhskt.claude.notification.permission.HookResponse
 import com.tkhskt.claude.notification.permission.PermissionRequest
 import com.tkhskt.claude.notification.permission.PermissionRequestHolder
-import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
 import java.net.InetAddress
@@ -61,15 +60,7 @@ class PermissionServer(
                     return
                 }
                 log.i { "PermissionRequest received: tool=${request.toolName} session=${request.sessionId}" }
-                val decision = try {
-                    runBlocking { holder.submit(request) }
-                } catch (e: TimeoutCancellationException) {
-                    log.i { "PermissionRequest for ${request.toolName} timed out; returning 503 so the hook falls through" }
-                    // Empty 503 → hook script sees empty stdout → exits 0 →
-                    // Claude Code falls back to its own terminal prompt.
-                    runCatching { exchange.sendResponseHeaders(503, -1) }
-                    return
-                }
+                val decision = runBlocking { holder.submit(request) }
                 log.i { "PermissionRequest for ${request.toolName} → $decision" }
                 val responseJson = HookResponse.forDecision(decision)
                 val bytes = responseJson.toByteArray(StandardCharsets.UTF_8)

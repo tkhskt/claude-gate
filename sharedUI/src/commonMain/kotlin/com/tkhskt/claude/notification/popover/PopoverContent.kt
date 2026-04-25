@@ -17,7 +17,7 @@ import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.HorizontalDivider // used by FieldList
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
@@ -35,7 +35,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.tkhskt.claude.notification.permission.PendingRequest
-import com.tkhskt.claude.notification.permission.PermissionRequest
 import com.tkhskt.claude.notification.permission.PermissionRequestHolder
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
@@ -50,7 +49,6 @@ fun PopoverContent(
     onQuit: () -> Unit = {},
 ) {
     val pending by holder.pending.collectAsState()
-    val lastTimeout by holder.lastTimeout.collectAsState()
     Surface(
         modifier = Modifier
             .fillMaxSize()
@@ -82,50 +80,16 @@ fun PopoverContent(
                 }
             }
             Spacer(Modifier.height(8.dp))
-            when {
-                pending != null -> RequestView(
+            if (pending != null) {
+                RequestView(
                     pending = pending!!,
                     onAllow = holder::allow,
                     onDeny = holder::deny,
                 )
-                lastTimeout != null -> TimeoutView(
-                    request = lastTimeout!!,
-                    onDismiss = holder::dismissTimeout,
-                )
-                else -> EmptyState()
+            } else {
+                EmptyState()
             }
         }
-    }
-}
-
-@Composable
-private fun TimeoutView(request: PermissionRequest, onDismiss: () -> Unit) {
-    Column(
-        modifier = Modifier.fillMaxSize(),
-        verticalArrangement = Arrangement.SpaceBetween,
-    ) {
-        Column(modifier = Modifier.fillMaxWidth()) {
-            Text(
-                text = "Request timed out",
-                style = MaterialTheme.typography.titleLarge,
-                color = MaterialTheme.colorScheme.error,
-            )
-            Spacer(Modifier.height(12.dp))
-            Text(
-                text = "Claude asked to use ${request.toolName} but no decision " +
-                    "was made in time. Claude has fallen back to its terminal prompt.",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurface,
-            )
-        }
-        Button(
-            onClick = onDismiss,
-            modifier = Modifier.fillMaxWidth(),
-            colors = ButtonDefaults.buttonColors(
-                containerColor = MaterialTheme.colorScheme.secondaryContainer,
-                contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
-            ),
-        ) { Text("Dismiss") }
     }
 }
 

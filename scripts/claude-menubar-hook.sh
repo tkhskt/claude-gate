@@ -9,7 +9,7 @@ set -u
 
 INPUT=$(cat)
 RESPONSE=$(
-  curl -sS --max-time 75 \
+  curl -sS \
     -H 'Content-Type: application/json' \
     --data-binary "$INPUT" \
     http://127.0.0.1:44215/permission-request 2>/dev/null
