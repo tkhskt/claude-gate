@@ -304,8 +304,15 @@ private fun DiffBlock(entries: List<DiffDisplay>) {
     val removeColor = Color(0x33EF4444)
     val jumpColor = Color(0x22808080)
     val textStyle = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace)
-    val lineNoWidth = 2
     val lineNoStyle = textStyle.copy(color = MaterialTheme.colorScheme.onSurfaceVariant)
+    // Pad single-digit line numbers to align with multi-digit ones, but only
+    // if the diff actually contains multi-digit line numbers (≥10 lines).
+    val maxLineNo = entries
+        .asSequence()
+        .filterIsInstance<DiffDisplay.Line>()
+        .maxOfOrNull { it.line.lineNo }
+        ?: 0
+    val lineNoWidth = maxLineNo.toString().length
 
     Surface(
         modifier = Modifier.fillMaxWidth(),
@@ -348,10 +355,6 @@ private fun DiffBlock(entries: List<DiffDisplay>) {
                                 .background(jumpColor)
                                 .padding(horizontal = 8.dp, vertical = 2.dp),
                         ) {
-                            Text(
-                                text = "".padStart(lineNoWidth),
-                                style = lineNoStyle,
-                            )
                             Text(
                                 text = " ⋯ @@ −${entry.oldSkipped} +${entry.newSkipped} @@",
                                 style = lineNoStyle,
