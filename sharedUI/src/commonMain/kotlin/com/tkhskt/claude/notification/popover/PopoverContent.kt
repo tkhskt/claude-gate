@@ -304,7 +304,7 @@ private fun DiffBlock(entries: List<DiffDisplay>) {
     val removeColor = Color(0x33EF4444)
     val jumpColor = Color(0x22808080)
     val textStyle = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace)
-    val lineNoWidth = 4
+    val lineNoWidth = 2
     val lineNoStyle = textStyle.copy(color = MaterialTheme.colorScheme.onSurfaceVariant)
 
     Surface(
