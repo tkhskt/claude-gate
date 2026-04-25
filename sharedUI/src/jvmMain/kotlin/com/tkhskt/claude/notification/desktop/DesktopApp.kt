@@ -73,21 +73,6 @@ fun ApplicationScope.DesktopApp() {
         }
     }
 
-    // Surface timeouts as macOS system notifications via TrayIcon.displayMessage.
-    LaunchedEffect(trayIconRef) {
-        val icon = trayIconRef ?: return@LaunchedEffect
-        holder.timeouts.collect { request ->
-            runCatching {
-                icon.displayMessage(
-                    "Permission request timed out",
-                    "Claude asked to use ${request.toolName} but no decision was made. " +
-                        "Claude will fall back to its terminal prompt.",
-                    TrayIcon.MessageType.INFO,
-                )
-            }
-        }
-    }
-
     // Reflect holder state in the menu bar icon color:
     // idle = white, awaiting decision = yellow, last request timed out = red.
     LaunchedEffect(trayIconRef) {

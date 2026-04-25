@@ -7,12 +7,25 @@ Allow / Deny from a popover without touching the terminal.
 Run the desktop application: `./gradlew :desktopApp:run`
 Run the desktop **hot reload** application: `./gradlew :desktopApp:hotRun --auto`
 
-### Claude Code hook
+### Claude Code hooks
 
-Register `scripts/claude-menubar-hook.sh` as a `PermissionRequest` hook so the
-running app receives permission requests.
+Register two hooks so the app receives both permission requests and the
+"tool is about to execute" signal:
 
-Add to `~/.claude/settings.json` (replace the absolute path):
+- `scripts/claude-menubar-hook.sh` — `PermissionRequest`. Forwards the request
+  to the running app and returns its Allow/Deny decision.
+- `scripts/claude-menubar-tool-resolved.sh` — `PostToolUse` /
+  `UserPromptSubmit`. `PostToolUse` clears the popover after the tool
+  has actually run (i.e. the request was approved somewhere).
+  `UserPromptSubmit` covers every other "the user moved on" case — most
+  importantly the manual terminal-deny path, for which Claude Code fires
+  no tool-level signal at all (see
+  [anthropics/claude-code#37769](https://github.com/anthropics/claude-code/issues/37769)).
+  The hook never influences Claude's flow. (`PreToolUse`, `PermissionDenied`,
+  `Stop`, and `PostToolUseFailure` were tested and dropped: too early,
+  auto-mode-only, redundant with `UserPromptSubmit`, or both.)
+
+Add to `~/.claude/settings.json` (replace the absolute paths):
 
 ```json
 {
@@ -26,6 +39,26 @@ Add to `~/.claude/settings.json` (replace the absolute path):
           }
         ]
       }
+    ],
+    "PostToolUse": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/absolute/path/to/claude-notification/scripts/claude-menubar-tool-resolved.sh"
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/absolute/path/to/claude-notification/scripts/claude-menubar-tool-resolved.sh"
+          }
+        ]
+      }
     ]
   }
 }
@@ -36,5 +69,9 @@ icon; click **許可** to allow or **却下** to deny. If the menu bar app is no
 running, the hook exits silently and Claude Code falls back to its default
 terminal prompt.
 
-The app exposes `POST http://127.0.0.1:44215/permission-request` for the hook
-script. Nothing is bound outside localhost.
+The app exposes the following endpoints on `127.0.0.1:44215` (loopback only,
+nothing bound outside localhost):
+
+- `POST /permission-request` — used by the `PermissionRequest` hook.
+- `POST /tool-resolved` — used by the `PostToolUse` and `UserPromptSubmit`
+  hooks to dismiss popovers whose decision was made elsewhere.
