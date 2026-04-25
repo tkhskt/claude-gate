@@ -22,7 +22,7 @@ object MacApp {
     private val log = Logger.withTag("MacApp")
     private val isMac = System.getProperty("os.name").orEmpty().lowercase().contains("mac")
 
-    private val libObjc by lazy {
+    internal val libObjc by lazy {
         runCatching { NativeLibrary.getInstance("objc.A") }.getOrNull()
     }
     private val libSystem by lazy {
@@ -30,7 +30,7 @@ object MacApp {
     }
     private val selRegisterName by lazy { libObjc?.getFunction("sel_registerName") }
     private val objcGetClass by lazy { libObjc?.getFunction("objc_getClass") }
-    private val objcMsgSend by lazy { libObjc?.getFunction("objc_msgSend") }
+    internal val objcMsgSend by lazy { libObjc?.getFunction("objc_msgSend") }
     private val dispatchAsyncF by lazy { libSystem?.getFunction("dispatch_async_f") }
     private val dispatchMainQueue by lazy {
         // `_dispatch_main_q` is the singleton main-queue global; its address is
@@ -38,8 +38,8 @@ object MacApp {
         runCatching { libSystem?.getGlobalVariableAddress("_dispatch_main_q") }.getOrNull()
     }
 
-    private fun sel(name: String): Pointer? = selRegisterName?.invokePointer(arrayOf(name))
-    private fun cls(name: String): Pointer? = objcGetClass?.invokePointer(arrayOf(name))
+    internal fun sel(name: String): Pointer? = selRegisterName?.invokePointer(arrayOf(name))
+    internal fun cls(name: String): Pointer? = objcGetClass?.invokePointer(arrayOf(name))
 
     fun interface DispatchWork : Callback {
         fun invoke(context: Pointer?)
@@ -48,7 +48,7 @@ object MacApp {
     // Keep strong refs so JNA callbacks aren't GC'd before AppKit invokes them.
     private val pendingWork = ConcurrentLinkedQueue<DispatchWork>()
 
-    private fun runOnAppKitMain(block: () -> Unit) {
+    internal fun runOnAppKitMain(block: () -> Unit) {
         val queue = dispatchMainQueue
         val asyncF = dispatchAsyncF
         if (queue == null || asyncF == null) {

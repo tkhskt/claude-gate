@@ -15,6 +15,7 @@ import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.WindowPosition
 import androidx.compose.ui.window.rememberWindowState
 import com.tkhskt.claude.notification.desktop.mac.MacApp
+import com.tkhskt.claude.notification.desktop.mac.MacStatusItem
 import com.tkhskt.claude.notification.permission.PermissionRequestHolder
 import com.tkhskt.claude.notification.popover.PopoverContent
 import com.tkhskt.claude.notification.server.PermissionServer
@@ -39,10 +40,14 @@ private const val POPOVER_WIDE_WIDTH_DP = 680
 private const val POPOVER_WIDE_HEIGHT_DP = 620
 private const val MENU_BAR_OFFSET_DP = 28
 private const val SCREEN_EDGE_MARGIN_DP = 8
-private const val TRAY_ICON_WIDTH = 38
-private const val TRAY_ICON_HEIGHT = 24
+private const val TRAY_ICON_WIDTH = 22
+// Match menu-bar thickness so the image's intrinsic bounds fill the full
+// slot vertically — NSStatusBarButton's layer auto-tracks bounds, and
+// bounds tracks the image rect. Without this the colored layer would only
+// fill the image's height, leaving vertical gaps inside the slot.
+private const val TRAY_ICON_HEIGHT = 22
 private const val TRAY_ICON_GLYPH = 14
-private const val TRAY_ICON_CORNER_RADIUS = 6
+private const val TRAY_ICON_CORNER_RADIUS = 4
 
 private val FILE_EDIT_TOOLS = setOf("Edit", "Write")
 
@@ -58,28 +63,60 @@ fun ApplicationScope.DesktopApp() {
     var trayAnchor by remember { mutableStateOf<Point?>(null) }
 
     var trayIconRef by remember { mutableStateOf<TrayIcon?>(null) }
+    var nativeTrayInstalled by remember { mutableStateOf(false) }
     DisposableEffect(Unit) {
         server.start()
-        val trayIcon = installTrayIcon { clickAt ->
-            trayAnchor = clickAt
+        val installedNative = MacStatusItem.install {
+            // Click runs on AppKit main; bounce to the JVM via these mutations
+            // (StateFlow setters and primitive var assignments are thread-safe
+            // in our usage).
+            trayAnchor = MacStatusItem.pointerLocation()
             holder.togglePopover()
+        }
+        nativeTrayInstalled = installedNative
+        val trayIcon = if (!installedNative) {
+            installTrayIcon { clickAt ->
+                trayAnchor = clickAt
+                holder.togglePopover()
+            }
+        } else {
+            null
         }
         trayIconRef = trayIcon
         onDispose {
             server.stop()
+            if (installedNative) {
+                MacStatusItem.uninstall()
+            }
             trayIcon?.let { runCatching { SystemTray.getSystemTray().remove(it) } }
             trayIconRef = null
+            nativeTrayInstalled = false
         }
     }
 
-    // Reflect holder state in the menu bar icon color:
-    // idle = white, awaiting decision = yellow.
-    LaunchedEffect(trayIconRef) {
-        val icon = trayIconRef ?: return@LaunchedEffect
+    // Reflect holder state in the menu bar icon:
+    //   - native path: white glyph image + layer.backgroundColor toggled
+    //     between transparent (idle) and amber (awaiting). Layer fills the
+    //     entire reserved slot so the colored area matches the highlight.
+    //   - AWT fallback: composite image with the rounded amber rect baked in.
+    LaunchedEffect(nativeTrayInstalled, trayIconRef) {
+        val nativeOn = nativeTrayInstalled
+        val icon = trayIconRef
+        if (!nativeOn && icon == null) return@LaunchedEffect
         holder.pending.collect { pending ->
             val state = if (pending != null) TrayState.AWAITING else TrayState.IDLE
-            val image = createTrayIconImage(state)
-            SwingUtilities.invokeLater { icon.image = image }
+            if (nativeOn) {
+                val glyph = createTrayIconImage(TrayState.IDLE) // glyph only, transparent
+                val bg = if (state == TrayState.AWAITING) {
+                    Color(0xFF, 0xC1, 0x07, 0xFF)
+                } else {
+                    null
+                }
+                MacStatusItem.setIconAndBackground(glyph, bg)
+            } else {
+                val image = createTrayIconImage(state)
+                SwingUtilities.invokeLater { icon?.image = image }
+            }
         }
     }
 

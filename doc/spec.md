@@ -55,8 +55,9 @@ tool 実行の許可リクエストを横取りし、ターミナルを開かず
 | `sharedUI/.../popover/LineDiff.kt`                                                | LCS ベース行 diff + コンテキスト省略 (`compactDiff`) |
 | `sharedUI/.../server/PermissionServer.kt`                                         | HTTP ハンドラ |
 | `sharedUI/.../desktop/DesktopApp.kt`                                              | ApplicationScope 直下の全体合成、Tray・Window・Effect |
-| `sharedUI/.../desktop/mac/MacApp.kt`                                              | AppKit main thread 経由の NSApp アクティベート／isActive |
-| `sharedUI/.../desktop/awt/TrayNpeSuppression.kt`                                  | JDK の TrayIcon→LightweightDispatcher NPE を黙らせる EventQueue shim |
+| `sharedUI/.../desktop/mac/MacApp.kt`                                              | AppKit main thread 経由の NSApp アクティベート／isActive。objc_msgSend / sel / cls / `runOnAppKitMain` を `internal` で公開 |
+| `sharedUI/.../desktop/mac/MacStatusItem.kt`                                       | `NSStatusItem` を JNA 直叩き。`button.layer.backgroundColor` でメニューバーの highlight 領域全体を塗る。runtime obj-c class でクリック target/action を実装 |
+| `sharedUI/.../desktop/awt/TrayNpeSuppression.kt`                                  | JDK の TrayIcon→LightweightDispatcher NPE を黙らせる EventQueue shim（AWT フォールバック時のみ意味あり） |
 | `desktopApp/src/main/kotlin/main.kt`                                              | エントリポイント |
 | `scripts/claude-menubar-hook.sh`                                                  | `PermissionRequest` hook 用 shell。curl で `/permission-request` に POST。失敗時 / 空応答時は exit 0 で Claude のフォールバックに委ねる |
 | `scripts/claude-menubar-tool-resolved.sh`                                         | `PostToolUse` / `UserPromptSubmit` hook 用 shell。`/tool-resolved` に POST して popover 解決を通知。常に空 stdout で Claude のフローには影響しない |
@@ -218,12 +219,17 @@ canJoinAllSpaces / window level 操作を試みたが、Space 切替時の一時
 
 ### 6.1 トレイアイコン
 
-- サイズ 38×24（画像）、角丸半径 6。白い丸の輪郭＋中央ドット（常に白）。
+- グリフ: 22×22 PNG（中央に小さな白い丸の輪郭＋ドット、それ以外は透過）。スロット幅は `[NSStatusItem setLength:22.0]` で固定。画像の高さはメニューバー厚と一致させ、`button.layer` の bounds = スロット全域となるようにしている。
+- 塗りは `button.layer` と `button.window.contentView.layer` の両方に同じ背景色／cornerRadius／masksToBounds を流す。NSStatusBarButton が contentView 内のサブビューとして配置されている世代では button.layer だけだとスロット全域を覆えないため、外殻の contentView.layer にも同色を流して隙間を埋める（多くの世代では両者が同一インスタンスになり冪等）
 - 背景色:
-  - IDLE（pending=null）: 透明
-  - AWAITING（pending≠null）: amber 500 (`#FFC107`)
-- 切替: `holder.pending` を `LaunchedEffect` で監視 → `SwingUtilities.invokeLater { icon.image = … }`
-- 既知の制約: 塗り領域 < クリック highlight 領域（AppKit 固有の padding）。詳細は `TODO.local.md`。
+  - IDLE（pending=null）: 透明（layer.backgroundColor = nil）
+  - AWAITING（pending≠null）: amber 500 (`#FFC107`)。`layer.cornerRadius = 6` + `masksToBounds = YES`
+- 実装経路:
+  - macOS: `MacStatusItem` が `[NSStatusBar systemStatusBar]` から `statusItemWithLength:NSVariableStatusItemLength` で `NSStatusItem` を作成、`button.wantsLayer = YES`。色は `layer.backgroundColor` に CGColor を流し込むことで、AppKit がそのアイテム用に確保している highlight 矩形全体を塗る（旧 AWT 実装で発生していた「塗り < highlight」の隙間が消える）
+  - 非 macOS / 何らかの理由でネイティブ install が失敗した場合: AWT `TrayIcon` フォールバック（複合画像で amber 矩形を焼き込み）
+- クリック: ネイティブ経路は runtime 生成 `NSObject` サブクラス (`CMNStatusItemClickTarget`) のインスタンスを `button.target` にして `action = onClick:` を設定。AppKit main thread から JVM 側の `togglePopover()` を発火
+- アンカー位置: クリック発生時に `MouseInfo.getPointerInfo().location` をキャッシュ。NSStatusItem の target/action は MouseEvent を持たないので mouse 位置を擬似 anchor として利用
+- 切替: `holder.pending` を `LaunchedEffect` で監視 → `MacStatusItem.setIconAndBackground(glyph, bg)`（AWT フォールバック時は従来通り `SwingUtilities.invokeLater { icon.image = … }`）
 
 ### 6.2 ポップオーバー状態切替
 
@@ -311,5 +317,4 @@ JVM: 17 以上（開発は Corretto 23 で確認）。Gradle 9、Compose Multipl
 
 ## 10. 既知の制約・未解決タスク
 
-`TODO.local.md`（git 非追跡）を参照。現状記録されている項目:
-- トレイアイコン塗り領域 < クリック highlight 領域の乖離（AWT `TrayIcon` の限界、解決には `NSStatusItem` JNA 直叩きが必要）
+`TODO.local.md`（git 非追跡）を参照。
