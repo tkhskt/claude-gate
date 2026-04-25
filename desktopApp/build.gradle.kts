@@ -28,6 +28,13 @@ compose.desktop {
             macOS {
                 iconFile.set(project.file("appIcons/MacosIcon.icns"))
                 bundleID = "com.tkhskt.claude.notification.desktopApp"
+                // Menu-bar agent: no Dock icon, no app-switcher entry.
+                infoPlist {
+                    extraKeysRawXml = """
+                        <key>LSUIElement</key>
+                        <true/>
+                    """.trimIndent()
+                }
             }
         }
     }

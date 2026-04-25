@@ -36,6 +36,12 @@ kotlin {
             implementation(compose.desktop.currentOs)
             implementation(libs.kotlinx.coroutines.swing)
             implementation(libs.jna)
+            implementation(libs.ktor.server.core)
+            implementation(libs.ktor.server.cio)
+            // Silence SLF4J's "No providers found" warning. Ktor uses SLF4J
+            // internally; we route our own logs through Kermit, so explicitly
+            // bind SLF4J to NOP rather than letting it fall back with a warn.
+            runtimeOnly(libs.slf4j.nop)
         }
 
     }

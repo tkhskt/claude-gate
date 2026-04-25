@@ -7,6 +7,30 @@ Allow / Deny from a popover without touching the terminal.
 Run the desktop application: `./gradlew :desktopApp:run`
 Run the desktop **hot reload** application: `./gradlew :desktopApp:hotRun --auto`
 
+### Packaging (.dmg)
+
+Build a distributable macOS bundle with the JRE included so end users don't
+need Java installed:
+
+```bash
+./gradlew :desktopApp:packageDistributionForCurrentOS
+```
+
+Outputs land in `desktopApp/build/compose/binaries/main/dmg/`. The bundle is
+unsigned. If a recipient downloaded the `.dmg` (e.g. from a browser, Slack,
+or AirDrop) macOS attaches a quarantine flag and Gatekeeper blocks the first
+launch — strip it after installing to `/Applications`:
+
+```bash
+xattr -dr com.apple.quarantine /Applications/claude-notification.app
+```
+
+Locally built `.dmg`s don't have the quarantine flag, so this step is only
+needed for distribution.
+
+Runtime logs are written to `~/Library/Logs/claude-notification.log`
+regardless of how the app was launched (terminal or Finder).
+
 ### Claude Code hooks
 
 Register two hooks so the app receives both permission requests and the
