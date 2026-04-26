@@ -778,7 +778,9 @@ private fun secondaryLineFor(request: PermissionRequest): String? {
         return relativeTo(request.cwd, path)
     }
     return when (request.toolName) {
-        "Bash", "PowerShell" -> (request.toolInput["command"] as? JsonPrimitive)?.content
+        // Bash / PowerShell intentionally omitted — the command is rendered as
+        // a CodeBlockSpec.Plain block below so single- and multi-line commands
+        // share the same dark-themed monospace treatment.
         "WebFetch" -> (request.toolInput["url"] as? JsonPrimitive)?.content
         "WebSearch" -> (request.toolInput["query"] as? JsonPrimitive)?.content
         "Agent" -> (request.toolInput["subagent_type"] as? JsonPrimitive)?.content
@@ -809,7 +811,7 @@ private fun codeBlockSpecFor(request: PermissionRequest, fileLineOffset: Int): C
     when (request.toolName) {
         "Bash", "PowerShell" -> {
             val cmd = (request.toolInput["command"] as? JsonPrimitive)?.content
-            if (!cmd.isNullOrBlank() && "\n" in cmd) {
+            if (!cmd.isNullOrBlank()) {
                 return CodeBlockSpec.Plain(title = "command", text = cmd)
             }
         }

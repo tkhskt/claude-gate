@@ -276,7 +276,7 @@ TopBar の `<project>` は `cwd` の最終セグメント、`<session>` は `ses
 - **HeaderSection**: 40×40 の角丸枠（背景 `BrandSoft` `#33009688` / 枠線 `Brand` `#009688` 40% アルファ）に Figma 由来のシールドアイコン (`Res.drawable.ic_permission_shield`、`#00685E`) を配置。右側に「Permission Request」タイトル + `headerSubtitleFor(toolName)` のサブテキスト
 - **PermissionCard**（`SelectionContainer` 内、選択コピー対象）:
   - メタデータ行: `TOOL` ラベル + `<TOOL_NAME>` バッジ（ティール薄塗り）
-  - セカンダリ行: ファイルパス（Edit/Write/Read/NotebookEdit、リポジトリ相対）/ コマンド（Bash, PowerShell）/ URL（WebFetch）/ クエリ（WebSearch）/ subagent 名（Agent）。該当が無ければ省略
+  - セカンダリ行: ファイルパス（Edit/Write/Read/NotebookEdit、リポジトリ相対）/ URL（WebFetch）/ クエリ（WebSearch）/ subagent 名（Agent）。該当が無ければ省略。Bash/PowerShell の command は Plain `CodeBlockSpec` 側で表示するためセカンダリ行には出さない
   - `CodeDiffBlock` または `FieldList` を本体として配置
 - **Actions**（selection 外）: 左に「Allow」（ティール塗り `Button`、Check アイコン）、右に「Deny」（淡い灰色 `OutlinedButton`、Deny アイコン）
 
@@ -291,7 +291,7 @@ Allow / Deny クリック時はポップオーバーを自動クローズ（`sub
 | Edit                 | `compactDiff(old→new)`（タイトル「<filename> — Diff」、`+N -N` カウンタ） | 0 件             |
 | Write                | content 全行を INSERT 扱い（タイトル「<filename> — Write」） | 0 件             |
 | NotebookEdit         | new_source 全行を INSERT（タイトル「<filename> — Cell」） | 0 件             |
-| Bash / PowerShell    | command が複数行の場合のみ Plain ブロック表示                | command 以外     |
+| Bash / PowerShell    | command を常に Plain ブロック表示（単行・複数行どちらも）     | command 以外     |
 | WebFetch             | prompt が非空なら Plain ブロック                         | url / prompt 以外 |
 | WebSearch            | なし                                                 | query 以外       |
 | その他               | なし                                                 | toolInput 全体   |
