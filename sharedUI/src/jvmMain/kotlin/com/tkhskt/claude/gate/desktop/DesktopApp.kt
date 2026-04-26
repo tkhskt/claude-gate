@@ -33,6 +33,7 @@ import java.awt.TrayIcon
 import java.awt.event.MouseAdapter
 import java.awt.event.MouseEvent
 import java.awt.image.BufferedImage
+import kotlin.time.Duration.Companion.milliseconds
 
 private const val POPOVER_TITLE = "Claude Gate"
 private const val POPOVER_WIDTH_DP = 360
@@ -72,6 +73,14 @@ fun ApplicationScope.DesktopApp() {
     var nativeTrayInstalled by remember { mutableStateOf(false) }
     DisposableEffect(Unit) {
         server.start()
+        // Event-driven dismiss: the moment NSApp resigns active (user clicked
+        // anywhere outside our windows), drop the popover. Complements the
+        // `[NSApp isActive]` polling loop in the popover Window scope —
+        // notification fires earlier and catches cases where polling latches
+        // onto a stale-true read (alwaysOnTop / borderless quirks).
+        MacApp.installResignActiveListener {
+            holder.setPopoverVisible(false)
+        }
         val installedNative = MacStatusItem.install {
             // Click runs on AppKit main; bounce to the JVM via these mutations
             // (StateFlow setters and primitive var assignments are thread-safe
@@ -195,16 +204,18 @@ fun ApplicationScope.DesktopApp() {
             window.toFront()
             window.requestFocus()
 
-            // Poll app-activation; close when the user has clicked into any
-            // other app. Space-following support was removed because sustaining
-            // activation across Space switches needs a richer event model.
-            delay(250)
+            // Belt-and-suspenders: NSApplicationDidResignActiveNotification
+            // (installed once in the DisposableEffect above) is the primary
+            // close trigger.  This polling loop catches edge cases where the
+            // notification doesn't fire — e.g., clicks that take focus only
+            // briefly, or runloop stalls during the activation race window.
+            delay(250.milliseconds)
             while (true) {
                 if (!MacApp.isAppActive()) {
                     holder.setPopoverVisible(false)
                     break
                 }
-                delay(150)
+                delay(80.milliseconds)
             }
         }
         AppTheme(onThemeChanged = {}) {

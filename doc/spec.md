@@ -213,12 +213,18 @@ exchange に 200+JSON（USER / EXTERNAL いずれも）を書き戻す
 
 ### 5.6 macOS アクティベーション検知
 
-`undecorated + transparent + alwaysOnTop` の AWT NSWindow は `canBecomeKeyWindow = NO` のため `WindowFocusListener` は不安定。代わりに:
+`undecorated + transparent + alwaysOnTop` の AWT NSWindow は `canBecomeKeyWindow = NO` のため `WindowFocusListener` は不安定。代わりに 2 経路でクローズを検知:
 
-1. 表示時: `MacApp.activateApp()` → `[NSApp activateIgnoringOtherApps:YES]`
-2. 150ms ごとに `[NSApp isActive]` ポーリング（`LaunchedEffect(renderVisible)` 内のコルーチン）
-3. false を観測したら `setPopoverVisible(false)`
-4. `renderVisible = false` になるとコルーチンはキャンセルされポーリング停止
+- **イベント駆動（主経路）**: アプリ起動時に `MacApp.installResignActiveListener` が
+  `NSApplicationDidResignActiveNotification` を購読する。NSApp が deactivate
+  した瞬間に AppKit main thread でハンドラが発火し、`setPopoverVisible(false)`
+  を呼ぶ。`alwaysOnTop` borderless ウィンドウで `[NSApp isActive]` ポーリングが
+  取りこぼしがちなケース（runloop が tick するまで isActive が遷移しない、など）
+  を即座に拾う。
+- **ポーリング（フォールバック）**: 表示時に `MacApp.activateApp()` → 80ms ごとに
+  `[NSApp isActive]` を再確認 → false なら `setPopoverVisible(false)`。
+  `renderVisible = false` でコルーチンはキャンセル。通知が何らかの理由で発火
+  しない場合の保険。
 
 JNA 呼び出しは `dispatch_async_f` + `_dispatch_main_q` で AppKit main thread に乗せる（Swing EDT ≠ AppKit main on JDK 17+）。
 

@@ -146,6 +146,100 @@ object MacApp {
         }
     }
 
+    private const val RESIGN_TARGET_CLASS_NAME = "CMNResignActiveTarget"
+    @Volatile private var resignActiveTargetInstance: Pointer? = null
+    @Suppress("unused")
+    private var resignActiveCallback: ResignActiveImp? = null
+    @Volatile private var resignActiveHandler: (() -> Unit)? = null
+
+    fun interface ResignActiveImp : Callback {
+        fun invoke(self: Pointer?, sel: Pointer?, notification: Pointer?)
+    }
+
+    /**
+     * Subscribes [callback] to `NSApplicationDidResignActiveNotification`.
+     * Fires on the AppKit main thread whenever this app loses frontmost
+     * status — robust to cases where polling `[NSApp isActive]` misses the
+     * transition (some clicks don't deactivate cleanly until the runloop
+     * ticks, especially with `alwaysOnTop` borderless windows).
+     *
+     * Idempotent: re-calling overrides the handler.  No unsubscribe — the
+     * observer lives for the process lifetime.
+     */
+    fun installResignActiveListener(callback: () -> Unit) {
+        if (!isMac) return
+        resignActiveHandler = callback
+        val msg = objcMsgSend ?: return
+        runOnAppKitMain {
+            runCatching {
+                val nsAppCls = cls("NSApplication") ?: return@runCatching
+                val sharedAppSel = sel("sharedApplication") ?: return@runCatching
+                val ncCls = cls("NSNotificationCenter") ?: return@runCatching
+                val defaultCenterSel = sel("defaultCenter") ?: return@runCatching
+                val addObserverSel = sel("addObserver:selector:name:object:") ?: return@runCatching
+                val onResignSel = sel("onResignActive:") ?: return@runCatching
+                val target = ensureResignActiveTarget() ?: return@runCatching
+
+                val nc = msg.invokePointer(arrayOf(ncCls, defaultCenterSel))
+                val nsApp = msg.invokePointer(arrayOf(nsAppCls, sharedAppSel))
+                val name = nsString("NSApplicationDidResignActiveNotification") ?: return@runCatching
+                msg.invokeVoid(arrayOf(nc, addObserverSel, target, onResignSel, name, nsApp))
+            }.onFailure { t -> log.w(t) { "installResignActiveListener failed" } }
+        }
+    }
+
+    private fun ensureResignActiveTarget(): Pointer? {
+        resignActiveTargetInstance?.let { return it }
+        val msg = objcMsgSend ?: return null
+        val cls = ensureResignActiveClass() ?: return null
+        val allocSel = sel("alloc") ?: return null
+        val initSel = sel("init") ?: return null
+        val allocated = msg.invokePointer(arrayOf(cls, allocSel)) ?: return null
+        if (allocated == Pointer.NULL) return null
+        val instance = msg.invokePointer(arrayOf(allocated, initSel)) ?: return null
+        if (instance == Pointer.NULL) return null
+        resignActiveTargetInstance = instance
+        return instance
+    }
+
+    private fun ensureResignActiveClass(): Pointer? {
+        val existing = cls(RESIGN_TARGET_CLASS_NAME)
+        if (existing != null && existing != Pointer.NULL) return existing
+        val libObjc = libObjc ?: return null
+        val nsObject = cls("NSObject") ?: return null
+        val allocateClassPair = libObjc.getFunction("objc_allocateClassPair")
+        val classAddMethod = libObjc.getFunction("class_addMethod")
+        val registerClassPair = libObjc.getFunction("objc_registerClassPair")
+        val onResignSel = sel("onResignActive:") ?: return null
+
+        val newCls = allocateClassPair.invokePointer(
+            arrayOf(nsObject, RESIGN_TARGET_CLASS_NAME, 0L),
+        ) ?: return null
+        if (newCls == Pointer.NULL) return null
+
+        val callback = ResignActiveImp { _, _, _ ->
+            try {
+                resignActiveHandler?.invoke()
+            } catch (t: Throwable) {
+                log.w(t) { "onResignActive handler threw" }
+            }
+        }
+        resignActiveCallback = callback // strong ref for the obj-c runtime IMP
+        classAddMethod.invokeInt(arrayOf(newCls, onResignSel, callback, "v@:@"))
+        registerClassPair.invokeVoid(arrayOf(newCls))
+        return newCls
+    }
+
+    private fun nsString(s: String): Pointer? {
+        val msg = objcMsgSend ?: return null
+        val nsStringCls = cls("NSString") ?: return null
+        val stringWithUTF8Sel = sel("stringWithUTF8String:") ?: return null
+        val cBytes = s.toByteArray(Charsets.UTF_8) + 0
+        val mem = Memory(cBytes.size.toLong())
+        mem.write(0, cBytes, 0, cBytes.size)
+        return msg.invokePointer(arrayOf(nsStringCls, stringWithUTF8Sel, mem))
+    }
+
     /**
      * Returns `[NSApp isActive]` — true when this app is frontmost. Read on
      * the AppKit main thread via [runOnAppKitMain] + [CompletableDeferred].
