@@ -232,7 +232,7 @@ exchange に 200+JSON（USER / EXTERNAL いずれも）を書き戻す
 |--------------------|----|
 | サイズ（初期）     | 360×420 dp（narrow）、Edit/Write 時 680×620 dp（wide、`isWide` トリガ） |
 | サイズ（変化）     | 自動リサイズはアプリ起動後の **最初の `pending` 非空遷移 1 回だけ**。そのときの tool カテゴリが Edit/Write なら wide、それ以外は narrow を適用。以降は category 切替・queue ドレイン・新規リクエスト到来のいずれでも自動リサイズせず、ユーザーの手動リサイズが唯一の真実 |
-| サイズ（最小）     | 420×420 dp（`window.minimumSize` を Compose `Window` の content スコープ内で `ComposeWindow` に直接設定）。Allow/Deny ボタン行のラベル折り返しを防ぐ下限 |
+| サイズ（最小）     | 360×420 dp（`window.minimumSize` を Compose `Window` の content スコープ内で `ComposeWindow` に直接設定）。Allow/Deny ボタン行のラベル折り返しを防ぐ下限 |
 | 位置               | アンカー優先度: ①トレイクリック時の `MouseEvent.locationOnScreen` キャッシュ → ②`MacStatusItem.statusItemScreenCenterX()`（`[NSStatusItem.button.window frame]` を JNA 経由で読み取りキャッシュ、auto-open 時にメニューバーアイコン直下へ揃える）→ ③画面右上フォールバック |
 | 装飾               | `undecorated = true, transparent = true, alwaysOnTop = true, focusable = true` |
 | 表示制御           | `renderVisible` を `visibleTarget` から 1 tick 遅らせ、位置確定後に true（初回表示のチラつき抑止） |
@@ -300,6 +300,14 @@ canJoinAllSpaces / window level 操作を試みたが、Space 切替時の一時
 複数 pending の切替は **タブ列廃止**。代わりに ProgressFooter の dots / chevron で 1 件ずつ移動する（`holder.selectTab(id)`）。Allow / Deny は選択中タブの ID に対して `holder.allow(id)` / `holder.deny(id)` を発火する。
 
 TopBar の `<project>` は `cwd` の最終セグメント、`<session>` は `session_id` の先頭 8 文字。どちらも該当値が無ければ省略。
+
+popover 全体の境界は `BorderStroke` を廃止し、`MacApp.roundPopoverWindow`
+で `[NSWindow setHasShadow:YES]` を有効化することで macOS ネイティブの
+ドロップシャドウを使う（`setMasksToBounds:YES` + `setCornerRadius:` で角丸の
+contentView shape を確定させているので、システムシャドウもその丸みに沿って
+描画される）。Compose 側に透明マージンを設けないため、AWT Window と可視
+Surface のサイズが一致し、リサイズの hit-test は可視 Surface のエッジで
+発生する。
 
 ### 6.3 `RequestView`
 

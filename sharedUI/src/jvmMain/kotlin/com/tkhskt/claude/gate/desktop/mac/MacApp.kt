@@ -114,6 +114,7 @@ object MacApp {
                 val setCornerRadiusSel = sel("setCornerRadius:") ?: return@runCatching
                 val setMasksToBoundsSel = sel("setMasksToBounds:") ?: return@runCatching
                 val setOpaqueSel = sel("setOpaque:") ?: return@runCatching
+                val setHasShadowSel = sel("setHasShadow:") ?: return@runCatching
                 val setBackgroundColorSel = sel("setBackgroundColor:") ?: return@runCatching
                 val nsColorClass = cls("NSColor") ?: return@runCatching
                 val clearColorSel = sel("clearColor") ?: return@runCatching
@@ -136,6 +137,11 @@ object MacApp {
                     if (!isMatch) continue
                     msg.invokeVoid(arrayOf(w, setOpaqueSel, 0L))
                     msg.invokeVoid(arrayOf(w, setBackgroundColorSel, clearColor))
+                    // Native NSWindow drop shadow.  Compose Desktop's borderless
+                    // transparent window defaults to no shadow; turning it on
+                    // here gives macOS-rendered shadow that follows the rounded
+                    // contentView shape (set below) — matches system popovers.
+                    msg.invokeVoid(arrayOf(w, setHasShadowSel, 1L))
                     val contentView = msg.invokePointer(arrayOf(w, contentViewSel))
                     msg.invokeVoid(arrayOf(contentView, setWantsLayerSel, 1L))
                     val layer = msg.invokePointer(arrayOf(contentView, layerSel))

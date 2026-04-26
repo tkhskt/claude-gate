@@ -100,7 +100,6 @@ fun PopoverContent(
         modifier = Modifier.fillMaxSize(),
         color = WindowBg,
         shape = RoundedCornerShape(12.dp),
-        border = BorderStroke(1.dp, Color(0x14000000)),
     ) {
         Column(modifier = Modifier.fillMaxSize()) {
             TopBar(
