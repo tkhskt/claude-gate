@@ -4,12 +4,27 @@ import co.touchlab.kermit.Logger
 import com.sun.jna.Callback
 import com.sun.jna.Memory
 import com.sun.jna.Pointer
+import com.sun.jna.Structure
 import java.awt.Color
 import java.awt.MouseInfo
 import java.awt.Point
 import java.awt.image.BufferedImage
 import java.io.ByteArrayOutputStream
 import javax.imageio.ImageIO
+
+/**
+ * NSRect (= CGRect) layout for JNA struct-by-value returns. We use it to read
+ * `[NSWindow frame]` so the popover can anchor under the status item even on
+ * auto-open paths (no click event = no MouseEvent geometry available).
+ */
+@Structure.FieldOrder("x", "y", "w", "h")
+internal open class NSRect : Structure() {
+    @JvmField var x: Double = 0.0
+    @JvmField var y: Double = 0.0
+    @JvmField var w: Double = 0.0
+    @JvmField var h: Double = 0.0
+    class ByValue : NSRect(), Structure.ByValue
+}
 
 /**
  * Native macOS NSStatusItem driven via JNA. Bypasses AWT's TrayIcon so the
@@ -37,6 +52,23 @@ object MacStatusItem {
 
     @Volatile private var statusItem: Pointer? = null
     @Volatile private var targetInstance: Pointer? = null
+
+    // Cached `[button.window frame]` (NSWindow screen coords, bottom-left origin).
+    // Populated on the AppKit main thread at install + on every icon/state
+    // update so the auto-open path can read it without a synchronous round-trip.
+    @Volatile private var cachedButtonFrame: DoubleArray? = null
+
+    // Apple Silicon returns 4-double structs in v0-v3 via plain `objc_msgSend`;
+    // x86_64 routes the same return through the `_stret` variant (caller passes
+    // a hidden out-pointer).  Pick the right symbol once.
+    private val isArm64Arch = run {
+        val arch = System.getProperty("os.arch").orEmpty().lowercase()
+        arch.contains("aarch64") || arch.contains("arm64")
+    }
+    private val rectMsgSend by lazy {
+        val sym = if (isArm64Arch) "objc_msgSend" else "objc_msgSend_stret"
+        runCatching { MacApp.libObjc?.getFunction(sym) }.getOrNull()
+    }
 
     // Strong refs — JNA callbacks must not be GC'd while the obj-c runtime
     // holds the IMP / target.
@@ -167,6 +199,7 @@ object MacStatusItem {
         }
 
         statusItem = item
+        captureButtonFrame()
         log.i { "NSStatusItem installed" }
     }
 
@@ -206,7 +239,43 @@ object MacStatusItem {
                 msg.invokeVoid(arrayOf(layer, setMasksToBoundsSel, 1L))
             }
         }
+        // Refresh the cached frame: the menu-bar layout can shift over time
+        // (e.g. another app adds/removes a status item to our left).
+        captureButtonFrame()
     }
+
+    /**
+     * Reads `[statusItem.button.window frame]` and caches its screen-space
+     * rectangle.  Must run on the AppKit main thread (caller is responsible —
+     * both call sites are inside `runOnAppKitMain` blocks).
+     */
+    private fun captureButtonFrame() {
+        val si = statusItem ?: return
+        val msg = MacApp.objcMsgSend ?: return
+        val rectMsg = rectMsgSend ?: return
+        val buttonSel = MacApp.sel("button") ?: return
+        val windowSel = MacApp.sel("window") ?: return
+        val frameSel = MacApp.sel("frame") ?: return
+        runCatching {
+            val button = msg.invokePointer(arrayOf(si, buttonSel)) ?: return@runCatching
+            if (button == Pointer.NULL) return@runCatching
+            val window = msg.invokePointer(arrayOf(button, windowSel)) ?: return@runCatching
+            if (window == Pointer.NULL) return@runCatching
+            val rect = rectMsg.invoke(
+                NSRect.ByValue::class.java,
+                arrayOf<Any>(window, frameSel),
+            ) as NSRect.ByValue
+            cachedButtonFrame = doubleArrayOf(rect.x, rect.y, rect.w, rect.h)
+        }.onFailure { t -> log.w(t) { "captureButtonFrame failed" } }
+    }
+
+    /**
+     * Center X of the status item in screen coordinates (AWT-compatible — both
+     * AWT and NSWindow use the same X axis).  Returns `null` until the first
+     * frame capture completes; callers should fall back to a static anchor.
+     */
+    fun statusItemScreenCenterX(): Double? =
+        cachedButtonFrame?.let { it[0] + it[2] / 2.0 }
 
     // Returns the set of layers we want to paint the background onto: the
     // button's backing layer plus its window contentView's backing layer

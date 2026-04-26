@@ -206,7 +206,7 @@ exchange に 200+JSON（USER / EXTERNAL いずれも）を書き戻す
 |--------------------|----|
 | サイズ（初期）     | 360×420 dp（narrow）、Edit/Write 時 680×620 dp（wide、`isWide` トリガ） |
 | サイズ（変化）     | tool カテゴリ narrow↔wide 切替時のみ自動適用。ユーザーの手動リサイズは保持 |
-| 位置               | トレイクリック時の `MouseEvent.locationOnScreen` をキャッシュ、auto-open 時も再利用。未キャッシュ時は画面右上フォールバック |
+| 位置               | アンカー優先度: ①トレイクリック時の `MouseEvent.locationOnScreen` キャッシュ → ②`MacStatusItem.statusItemScreenCenterX()`（`[NSStatusItem.button.window frame]` を JNA 経由で読み取りキャッシュ、auto-open 時にメニューバーアイコン直下へ揃える）→ ③画面右上フォールバック |
 | 装飾               | `undecorated = true, transparent = true, alwaysOnTop = true, focusable = true` |
 | 表示制御           | `renderVisible` を `visibleTarget` から 1 tick 遅らせ、位置確定後に true（初回表示のチラつき抑止） |
 

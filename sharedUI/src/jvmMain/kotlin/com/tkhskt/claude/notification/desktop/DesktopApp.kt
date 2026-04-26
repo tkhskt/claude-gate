@@ -265,15 +265,17 @@ private fun popoverPosition(widthDp: Int, anchor: Point?): WindowPosition {
     val screenX = screenBounds?.x ?: 0
     val screenY = screenBounds?.y ?: 0
     val screenWidth = screenBounds?.width ?: 1440
-    val x = if (anchor != null) {
-        (anchor.x - widthDp / 2).coerceIn(
+    // Anchor priority: explicit click coords → cached NSStatusItem center →
+    // top-right fallback.  The status-item route makes auto-opens land under
+    // the menu-bar icon even when the user never clicked the tray.
+    val centerX = anchor?.x
+        ?: MacStatusItem.statusItemScreenCenterX()?.toInt()
+    val x = if (centerX != null) {
+        (centerX - widthDp / 2).coerceIn(
             screenX + SCREEN_EDGE_MARGIN_DP,
             screenX + screenWidth - widthDp - SCREEN_EDGE_MARGIN_DP,
         )
     } else {
-        // No tray click seen yet (auto-open on first run): anchor to the
-        // top-right edge of the primary display — a stable, predictable spot
-        // near the menu bar.
         screenX + screenWidth - widthDp - SCREEN_EDGE_MARGIN_DP
     }
     val y = screenY + MENU_BAR_OFFSET_DP
