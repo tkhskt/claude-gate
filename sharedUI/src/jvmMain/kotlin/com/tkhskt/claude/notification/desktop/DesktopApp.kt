@@ -138,12 +138,18 @@ fun ApplicationScope.DesktopApp() {
         position = popoverPosition(POPOVER_WIDTH_DP, anchor = null),
     )
 
-    // Auto-size only when the tool *category* flips. Within the same category
-    // we leave windowState.size alone so the user's manual resize is kept.
-    LaunchedEffect(isWide) {
+    // Auto-fit fires exactly once per app session: the first time `pending`
+    // becomes non-empty we pick the preset that matches the tool category, and
+    // from then on the user's size is the source of truth — no further category
+    // flips ever resize the window. Trades "Edit always opens wide" for a
+    // predictable, user-controlled mental model.
+    var hasAutoSized by remember { mutableStateOf(false) }
+    LaunchedEffect(pending.isNotEmpty()) {
+        if (hasAutoSized || pending.isEmpty()) return@LaunchedEffect
         val width = if (isWide) POPOVER_WIDE_WIDTH_DP else POPOVER_WIDTH_DP
         val height = if (isWide) POPOVER_WIDE_HEIGHT_DP else POPOVER_HEIGHT_DP
         windowState.size = DpSize(width.dp, height.dp)
+        hasAutoSized = true
     }
 
     // Compute the target position *before* flipping `visible` so the AWT window

@@ -205,7 +205,7 @@ exchange に 200+JSON（USER / EXTERNAL いずれも）を書き戻す
 | 属性               | 値 |
 |--------------------|----|
 | サイズ（初期）     | 360×420 dp（narrow）、Edit/Write 時 680×620 dp（wide、`isWide` トリガ） |
-| サイズ（変化）     | tool カテゴリ narrow↔wide 切替時のみ自動適用。ユーザーの手動リサイズは保持 |
+| サイズ（変化）     | 自動リサイズはアプリ起動後の **最初の `pending` 非空遷移 1 回だけ**。そのときの tool カテゴリが Edit/Write なら wide、それ以外は narrow を適用。以降は category 切替・queue ドレイン・新規リクエスト到来のいずれでも自動リサイズせず、ユーザーの手動リサイズが唯一の真実 |
 | サイズ（最小）     | 420×420 dp（`window.minimumSize` を Compose `Window` の content スコープ内で `ComposeWindow` に直接設定）。Allow/Deny ボタン行のラベル折り返しを防ぐ下限 |
 | 位置               | アンカー優先度: ①トレイクリック時の `MouseEvent.locationOnScreen` キャッシュ → ②`MacStatusItem.statusItemScreenCenterX()`（`[NSStatusItem.button.window frame]` を JNA 経由で読み取りキャッシュ、auto-open 時にメニューバーアイコン直下へ揃える）→ ③画面右上フォールバック |
 | 装飾               | `undecorated = true, transparent = true, alwaysOnTop = true, focusable = true` |
