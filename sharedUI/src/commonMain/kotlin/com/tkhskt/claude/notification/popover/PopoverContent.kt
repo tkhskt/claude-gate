@@ -2,6 +2,7 @@ package com.tkhskt.claude.notification.popover
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -41,7 +42,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.TextStyle
@@ -50,10 +50,13 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import claude_notification.sharedui.generated.resources.Res
+import claude_notification.sharedui.generated.resources.ic_permission_shield
 import com.tkhskt.claude.notification.permission.PendingRequest
 import com.tkhskt.claude.notification.permission.PermissionRequest
 import com.tkhskt.claude.notification.permission.PermissionRequestHolder
 import kotlinx.serialization.json.Json
+import org.jetbrains.compose.resources.painterResource
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonNull
@@ -73,8 +76,6 @@ private val TextSecondary = Color(0xFF3F4947)
 private val TextTertiary = Color(0xFF0F172A)
 private val Brand = Color(0xFF009688)
 private val BrandSoft = Color(0x33009688)
-private val WarningSoft = Color(0xFFFFFBEB)
-private val WarningStrong = Color(0xFFB45309)
 private val DenyBg = Color(0xFFEEEEF0)
 private val DiffBg = Color(0xFF1E1E1E)
 private val DiffHeaderBg = Color(0xFF2D2D2D)
@@ -229,7 +230,7 @@ private fun RequestView(
             Spacer(Modifier.height(20.dp))
             HeaderSection(toolName = pending.request.toolName)
             Spacer(Modifier.height(16.dp))
-            SelectionContainer { PermissionCard(pending.request) }
+            SelectionContainer { PermissionCard(pending.request, pending.fileLineOffset) }
         }
         Spacer(Modifier.height(16.dp))
         Actions(onAllow = onAllow, onDeny = onDeny)
@@ -248,14 +249,14 @@ private fun HeaderSection(toolName: String) {
             modifier = Modifier
                 .size(40.dp)
                 .clip(RoundedCornerShape(8.dp))
-                .background(WarningSoft)
-                .border(1.dp, WarningStrong.copy(alpha = 0.4f), RoundedCornerShape(8.dp)),
+                .background(BrandSoft)
+                .border(1.dp, Brand.copy(alpha = 0.4f), RoundedCornerShape(8.dp)),
             contentAlignment = Alignment.Center,
         ) {
-            WarningTriangleIcon(
-                modifier = Modifier.size(22.dp),
-                fill = WarningStrong,
-                mark = Color.White,
+            Image(
+                painter = painterResource(Res.drawable.ic_permission_shield),
+                contentDescription = null,
+                modifier = Modifier.size(width = 16.dp, height = 20.dp),
             )
         }
         Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
@@ -275,9 +276,9 @@ private fun HeaderSection(toolName: String) {
 }
 
 @Composable
-private fun PermissionCard(request: PermissionRequest) {
+private fun PermissionCard(request: PermissionRequest, fileLineOffset: Int) {
     val secondary = secondaryLineFor(request)
-    val codeBlock = codeBlockSpecFor(request)
+    val codeBlock = codeBlockSpecFor(request, fileLineOffset)
     val extras = extraFields(request)
 
     Surface(
@@ -700,21 +701,6 @@ private fun FieldValue(value: JsonElement) {
 // ---------------- Icons (simple Canvas glyphs) -----------------
 
 @Composable
-private fun WarningTriangleIcon(modifier: Modifier, fill: Color, mark: Color) = Canvas(modifier) {
-    val s = size.minDimension
-    val triangle = Path().apply {
-        moveTo(s * 0.50f, s * 0.08f)
-        lineTo(s * 0.96f, s * 0.86f)
-        lineTo(s * 0.04f, s * 0.86f)
-        close()
-    }
-    drawPath(triangle, fill)
-    val markStroke = Stroke(width = s * 0.10f, cap = StrokeCap.Round)
-    drawLine(mark, Offset(s * 0.50f, s * 0.36f), Offset(s * 0.50f, s * 0.62f), markStroke.width, markStroke.cap)
-    drawCircle(mark, s * 0.06f, Offset(s * 0.50f, s * 0.76f))
-}
-
-@Composable
 private fun ChevronIcon(left: Boolean, color: Color) =
     Canvas(modifier = Modifier.size(width = 6.dp, height = 10.dp)) {
         val w = size.width
@@ -800,9 +786,9 @@ private fun secondaryLineFor(request: PermissionRequest): String? {
     }
 }
 
-private fun codeBlockSpecFor(request: PermissionRequest): CodeBlockSpec? {
+private fun codeBlockSpecFor(request: PermissionRequest, fileLineOffset: Int): CodeBlockSpec? {
     val title = codeBlockTitle(request)
-    editDiff(request.toolName, request.toolInput)?.let { lines ->
+    editDiff(request.toolName, request.toolInput, fileLineOffset)?.let { lines ->
         val compact = compactDiff(lines)
         val adds = lines.count { it.op == DiffOp.INSERT }
         val removes = lines.count { it.op == DiffOp.DELETE }
@@ -891,11 +877,11 @@ private fun relativeTo(cwd: String, absolutePath: String): String {
     }
 }
 
-private fun editDiff(toolName: String, input: JsonObject): List<DiffLine>? {
+private fun editDiff(toolName: String, input: JsonObject, lineOffset: Int): List<DiffLine>? {
     if (toolName != "Edit") return null
     val oldStr = (input["old_string"] as? JsonPrimitive)?.content ?: return null
     val newStr = (input["new_string"] as? JsonPrimitive)?.content ?: return null
-    return lineDiff(oldStr, newStr)
+    return lineDiff(oldStr, newStr, lineOffset = lineOffset)
 }
 
 private fun writeContent(toolName: String, input: JsonObject): List<String>? {

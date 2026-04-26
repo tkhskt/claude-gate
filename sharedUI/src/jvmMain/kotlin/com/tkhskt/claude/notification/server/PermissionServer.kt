@@ -15,7 +15,9 @@ import io.ktor.server.response.respondText
 import io.ktor.server.routing.RoutingContext
 import io.ktor.server.routing.post
 import io.ktor.server.routing.routing
+import java.io.File
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonPrimitive
 
 /**
  * Local IPC over HTTP. Replaces the JDK-only `com.sun.net.httpserver.HttpServer`
@@ -60,7 +62,7 @@ class PermissionServer(
             return
         }
         log.i { "PermissionRequest received: tool=${request.toolName} session=${request.sessionId}" }
-        val decision = holder.submit(request)
+        val decision = holder.submit(request, fileLineOffset = computeFileLineOffset(request))
         log.i { "PermissionRequest for ${request.toolName} → $decision" }
         val responseJson = HookResponse.forDecision(decision)
         call.respondText(responseJson, ContentType.Application.Json, HttpStatusCode.OK)
@@ -82,6 +84,24 @@ class PermissionServer(
         // 200 with empty {} — avoid any "no decision" ambiguity at Claude's side.
         // PostToolUse hooks ignore the body anyway.
         call.respondText("{}", ContentType.Application.Json, HttpStatusCode.OK)
+    }
+
+    /**
+     * Locate `old_string` inside the target file and return the count of
+     * preceding newlines, i.e. the 0-based line index of the snippet's first
+     * line. Returns 0 for non-Edit tools, missing files, or unmatched text —
+     * the popover then falls back to snippet-local "1, 2, 3…" numbering.
+     */
+    private fun computeFileLineOffset(request: PermissionRequest): Int {
+        if (request.toolName != "Edit") return 0
+        val filePath = (request.toolInput["file_path"] as? JsonPrimitive)?.content ?: return 0
+        val oldString = (request.toolInput["old_string"] as? JsonPrimitive)?.content ?: return 0
+        val file = File(filePath)
+        if (!file.isFile) return 0
+        val content = runCatching { file.readText() }.getOrNull() ?: return 0
+        val idx = content.indexOf(oldString)
+        if (idx < 0) return 0
+        return content.substring(0, idx).count { it == '\n' }
     }
 
     companion object {

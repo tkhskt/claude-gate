@@ -11,6 +11,13 @@ import kotlinx.coroutines.sync.withLock
 data class PendingRequest(
     val id: String,
     val request: PermissionRequest,
+    /**
+     * 0-based line offset of the diff snippet inside the target file, so the
+     * popover can render line numbers in file coordinates instead of
+     * snippet-local "1, 2, 3…". Computed by the JVM server (which reads
+     * `file_path`) and 0 when no file is involved or the lookup failed.
+     */
+    val fileLineOffset: Int = 0,
     internal val deferred: CompletableDeferred<DecisionResult>,
 )
 
@@ -41,13 +48,13 @@ class PermissionRequestHolder {
     private val idMutex = Mutex()
     private var idCounter = 0L
 
-    suspend fun submit(request: PermissionRequest): Decision {
+    suspend fun submit(request: PermissionRequest, fileLineOffset: Int = 0): Decision {
         val id = idMutex.withLock {
             idCounter += 1
             "req-$idCounter"
         }
         val deferred = CompletableDeferred<DecisionResult>()
-        val entry = PendingRequest(id, request, deferred)
+        val entry = PendingRequest(id, request, fileLineOffset, deferred)
         _pending.update { it + entry }
         _selectedId.update { current -> current ?: id }
         // Re-open the popover on every new arrival so the user notices.

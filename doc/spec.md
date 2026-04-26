@@ -137,7 +137,7 @@ tool 実行の許可リクエストを横取りし、ターミナルを開かず
 | `selectedId: StateFlow<String?>`           | 現在表示中のリクエスト ID。新着到着時、未選択ならば自動でその ID を選択（既選択なら維持） |
 | `popoverVisible: StateFlow<Boolean>`       | ポップオーバー表示中か。新着到着で必ず true に再セット |
 
-`PendingRequest` は `id`（"req-N" 形式、内部 Mutex で生成）/ `request` / `deferred` を持つ。
+`PendingRequest` は `id`（"req-N" 形式、内部 Mutex で生成）/ `request` / `fileLineOffset`（Edit 用、CodeDiffBlock の行番号を実ファイル基準に揃える 0-based オフセット）/ `deferred` を持つ。
 
 公開メソッド: `submit / allow(id) / deny(id) / selectTab(id) / togglePopover / setPopoverVisible / resolveExternally`。
 
@@ -272,7 +272,7 @@ TopBar の `<project>` は `cwd` の最終セグメント、`<session>` は `ses
 
 `Column { HeaderSection, PermissionCard, Spacer(weight=1f), Actions }`。
 
-- **HeaderSection**: 40×40 のティール (`#009688`) アイコン枠 + `ToolGlyph` + 「Permission Request」タイトル + `headerSubtitleFor(toolName)` のサブテキスト
+- **HeaderSection**: 40×40 の角丸枠（背景 `BrandSoft` `#33009688` / 枠線 `Brand` `#009688` 40% アルファ）に Figma 由来のシールドアイコン (`Res.drawable.ic_permission_shield`、`#00685E`) を配置。右側に「Permission Request」タイトル + `headerSubtitleFor(toolName)` のサブテキスト
 - **PermissionCard**（`SelectionContainer` 内、選択コピー対象）:
   - メタデータ行: `TOOL` ラベル + `<TOOL_NAME>` バッジ（ティール薄塗り）
   - セカンダリ行: ファイルパス（Edit/Write/Read/NotebookEdit、リポジトリ相対）/ コマンド（Bash, PowerShell）/ URL（WebFetch）/ クエリ（WebSearch）/ subagent 名（Agent）。該当が無ければ省略
@@ -302,7 +302,7 @@ Allow / Deny クリック時はポップオーバーを自動クローズ（`sub
 - 外枠: 黒背景 `#1E1E1E`、角丸 8dp
 - 上部バー: `#2D2D2D`、`<filename> — Diff` などのタイトル、右端に `+N` (`#5EEAD4`) と `-N` (`#FCA5A5`) カウンタ
 - Body（Diff の場合）:
-  - 行番号カラム（DELETE=旧ファイル行番号、INSERT/EQUAL=新ファイル行番号）— **常に左端**
+  - 行番号カラム（DELETE=旧ファイル行番号、INSERT/EQUAL=新ファイル行番号）— **常に左端**。Edit ツールではサーバ側 (`PermissionServer.computeFileLineOffset`) が `file_path` を読んで `old_string` の位置を求め、その行オフセットを `PendingRequest.fileLineOffset` 経由で `lineDiff` に渡すので、ファイル中央の編集でも実際のファイル行番号で表示される（読み取り失敗・未マッチ時は 0 オフセットにフォールバック）
   - プレフィックス: `+` (INSERT, 緑系背景 `#4D134E4A`) / `-` (DELETE, 赤系背景 `#4D7F1D1D`) / ` ` (EQUAL, 透過)
   - 順序は **行番号 → +/- → 内容**（Figma の「+/- → 行番号 → 内容」とは別、現行 UX を維持）
   - コンテキスト: 変更の前後 3 行だけ表示、それ以上離れた連続 EQUAL は ` ⋯ @@ -N +M @@` バナーで省略

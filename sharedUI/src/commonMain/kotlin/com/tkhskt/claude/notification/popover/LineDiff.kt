@@ -18,8 +18,12 @@ internal sealed interface DiffDisplay {
  * Produces a line-level diff of [a] → [b] using a standard LCS table. O(n·m)
  * time and space; fine for the short snippets we render in the popover.
  * Each returned [DiffLine] carries a display-ready line number.
+ *
+ * [lineOffset] is added to every emitted line number so callers can render
+ * line numbers in terms of the surrounding file (Edit's `old_string` rarely
+ * starts at line 1). Pass `0` for a snippet shown standalone.
  */
-internal fun lineDiff(a: String, b: String): List<DiffLine> {
+internal fun lineDiff(a: String, b: String, lineOffset: Int = 0): List<DiffLine> {
     val aLines = a.split("\n")
     val bLines = b.split("\n")
     val n = aLines.size
@@ -65,7 +69,7 @@ internal fun lineDiff(a: String, b: String): List<DiffLine> {
             DiffOp.DELETE -> { oldNo++; oldNo }
             DiffOp.INSERT -> { newNo++; newNo }
         }
-        DiffLine(op, text, display)
+        DiffLine(op, text, display + lineOffset)
     }
 }
 
