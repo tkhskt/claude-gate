@@ -49,7 +49,7 @@ tool 実行の許可リクエストを横取りし、ターミナルを開かず
 | ファイル                                                                           | 役割 |
 |-----------------------------------------------------------------------------------|------|
 | `sharedUI/.../permission/PermissionRequest.kt`                                    | `PermissionRequest` 等 hook input の `@Serializable` DTO |
-| `sharedUI/.../permission/PermissionRequestHolder.kt`                              | 状態ホルダー。`submit / allow / deny / togglePopover / setPopoverVisible / dismissTimeout / resolveExternally` |
+| `sharedUI/.../permission/PermissionRequestHolder.kt`                              | 状態ホルダー。`submit / allow(id) / deny(id) / selectTab(id) / togglePopover / setPopoverVisible / resolveExternally`。複数 pending を List で保持（タブ表示） |
 | `sharedUI/.../permission/HookResponse.kt`                                         | `hookSpecificOutput.decision.behavior` JSON 生成 |
 | `sharedUI/.../popover/PopoverContent.kt`                                          | ポップオーバー本体 Composable |
 | `sharedUI/.../popover/LineDiff.kt`                                                | LCS ベース行 diff + コンテキスト省略 (`compactDiff`) |
@@ -131,23 +131,31 @@ tool 実行の許可リクエストを横取りし、ターミナルを開かず
 
 ### 5.1 状態モデル（`PermissionRequestHolder`）
 
-| Flow                                  | 型 | 意味 |
-|---------------------------------------|-----|------|
-| `pending: StateFlow<PendingRequest?>` | UI 表示中の「このリクエストの Allow/Deny 待ち」 |
-| `popoverVisible: StateFlow<Boolean>`  | ポップオーバー表示中か（手動 toggle / auto-open / アクティブ外 close と連動） |
+| Flow                                       | 意味 |
+|--------------------------------------------|------|
+| `pending: StateFlow<List<PendingRequest>>` | 同時並行で受け付けている全リクエスト。UI ではタブ列として描画 |
+| `selectedId: StateFlow<String?>`           | 現在選択中のタブ ID。新着到着時、未選択ならば自動でその ID を選択（既選択なら維持） |
+| `popoverVisible: StateFlow<Boolean>`       | ポップオーバー表示中か。新着到着で必ず true に再セット |
 
-公開メソッド: `submit / allow / deny / togglePopover / setPopoverVisible / resolveExternally`。
+`PendingRequest` は `id`（"req-N" 形式、内部 Mutex で生成）/ `request` / `deferred` を持つ。
 
-`resolveExternally(other, override?)` は deferred を**完了** させる（cancel ではない）。マッチ条件と decision は event ごとに分岐:
+公開メソッド: `submit / allow(id) / deny(id) / selectTab(id) / togglePopover / setPopoverVisible / resolveExternally`。
 
-| `hook_event_name`        | マッチ条件                                                         | decision |
-|--------------------------|--------------------------------------------------------------------|----------|
-| `PostToolUse`            | `session_id` + `tool_name` + `tool_input` 完全一致                 | `ALLOW`  |
-| `UserPromptSubmit`       | `session_id` のみ（次プロンプト送信＝古い pending を放棄したとみなす） | `DENY`   |
+`submit` は **直列化しない**: 各呼び出しが自分専用の `CompletableDeferred` を持ち、複数の Ktor ハンドラから同時 await できる。pending リストへの追加・削除と ID 採番だけが排他制御の対象。
 
-`submit` 側ではこの完了が `EXTERNAL` 由来であると識別し、`_popoverVisible` には触れず `_pending` だけ finally でクリアする。これにより popover が開いていれば内容だけ「Waiting for Claude…」に切り替わり、ユーザーが popover を見ていない時は何も起きない。
+`resolveExternally(other)` は deferred を**完了** させる:
 
-deferred を complete してから `submit` が return するため、`PermissionRequest` の HTTP 応答は通常の `200 + hookSpecificOutput.decision.behavior` JSON となる。Claude は決定済みとして扱い再発火しない（cancel + 204 空 body だと Claude が「未決定」とみなして PermissionRequest を再投入する挙動を回避）。
+| `hook_event_name`        | マッチ条件                                                              | decision     | 効果                                   |
+|--------------------------|-------------------------------------------------------------------------|--------------|----------------------------------------|
+| `PostToolUse`            | `session_id` + `tool_name` + `tool_input` 完全一致（**一件だけ**）       | `ALLOW`      | 該当タブだけ消える                      |
+| `UserPromptSubmit`       | `session_id` 一致（同セッションの**全 pending**）                         | `DENY`       | そのセッションの pending タブを一斉削除 |
+
+`submit` 内で deferred 完了後の挙動:
+- `_pending` から自分の entry を削除、`_selectedId` がそれを指していたなら先頭の残存タブにフォールバック
+- `result.source == USER` かつ `_pending` が空のときだけ `_popoverVisible = false`（最後のユーザー判定でポップオーバーを閉じる）
+- EXTERNAL 解決はポップオーバーを閉じない（ユーザーが見ているなら状態遷移を見せる）
+
+deferred を complete してから `submit` が return するため、`PermissionRequest` の HTTP 応答は通常の `200 + hookSpecificOutput.decision.behavior` JSON となる。Claude は決定済みとして扱い再発火しない。
 
 ### 5.2 リクエスト処理フロー
 
@@ -171,11 +179,13 @@ exchange に 200+JSON（USER / EXTERNAL いずれも）を書き戻す
 
 ### 5.3 並行リクエスト
 
-- **同時複数到着**: `submitMutex` で UI 表示は直列化。各 submit 呼び出しは自分専用の `CompletableDeferred` を持つため、`allow/deny` は「現在表示中」のリクエストの deferred のみ完了させる。対応表:
-  - A 到着 → 表示 → ユーザー判定 → A の exchange に応答 → mutex 解放
-  - B 到着（A 処理中）→ mutex 待ち → A 完了後に UI 切替 → B 判定 → B の exchange に応答
-- **執行スレッド**: `HttpServer` は `Executors.newCachedThreadPool()`。`PermissionRequest` ハンドラが最大 60s スレッドを占有しても新規リクエストには都度スレッドが供給される（fixed pool だと `/tool-resolved` などの軽量エンドポイントが starvation する）。
-- **応答の取り違えは発生しない**: 各ハンドラの `exchange` / `deferred` は呼び出しローカル。
+- **同時複数到着**: 並列に受け入れ、すべてを **タブとして同時表示**。ユーザーは任意のタブで Allow / Deny を独立に選択可。直列化（旧 `submitMutex`）は撤去。
+  - A 到着 → タブ1表示 → B 到着 → タブ2追加（選択は A のまま） → C 到着 → タブ3追加
+  - ユーザーが A を Allow → タブ1消滅、選択は B（先頭の残存）に遷移
+  - C を先に Deny → タブ3消滅、A/B はそのまま
+  - すべて解決されると `_pending` 空 → 最後のユーザー判定で popover が閉じる
+- **執行**: Ktor (CIO) のコルーチンディスパッチャで各ハンドラが並列に走る。各 `submit` は独立した `CompletableDeferred` を待つだけなので互いをブロックしない。
+- **応答の取り違えは発生しない**: 各 deferred は ID で正確に呼び分けられる（`allow(id)` / `deny(id)`）。タブを跨いだ誤判定は構造的に起きない。
 
 ### 5.4 ユーザー操作
 
@@ -233,10 +243,13 @@ canJoinAllSpaces / window level 操作を試みたが、Space 切替時の一時
 
 ### 6.2 ポップオーバー状態切替
 
-| `pending` | 表示                      |
-|-----------|---------------------------|
-| ≠ null    | `RequestView`（ツール詳細＋Allow/Deny） |
-| null      | `EmptyState`（"Waiting for Claude…"） |
+| `pending`        | 表示                      |
+|------------------|---------------------------|
+| 空               | `EmptyState`（"Waiting for Claude…"） |
+| 1 件             | ヘッダー + `RequestView`（タブ列なし、`pending.size > 1` のときだけタブ列表示） |
+| 2 件以上         | ヘッダー + `PrimaryScrollableTabRow` + 選択中タブの `RequestView` |
+
+タブのラベルは `"<順番>. <toolName>"` 形式（例: `"1. Edit"`）。タブクリックは `holder.selectTab(id)` を呼ぶ。Allow / Deny は選択中タブの ID に対して `holder.allow(id)` / `holder.deny(id)` を発火する。
 
 ### 6.3 `RequestView`
 

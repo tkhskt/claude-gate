@@ -104,7 +104,7 @@ fun ApplicationScope.DesktopApp() {
         val icon = trayIconRef
         if (!nativeOn && icon == null) return@LaunchedEffect
         holder.pending.collect { pending ->
-            val state = if (pending != null) TrayState.AWAITING else TrayState.IDLE
+            val state = if (pending.isNotEmpty()) TrayState.AWAITING else TrayState.IDLE
             if (nativeOn) {
                 val glyph = createTrayIconImage(TrayState.IDLE) // glyph only, transparent
                 val bg = if (state == TrayState.AWAITING) {
@@ -122,7 +122,10 @@ fun ApplicationScope.DesktopApp() {
 
     val visibleTarget by holder.popoverVisible.collectAsState()
     val pending by holder.pending.collectAsState()
-    val isWide = pending?.request?.toolName in FILE_EDIT_TOOLS
+    // Wide layout if any pending request is a file edit/write — diff blocks
+    // get visibly cramped in the narrow layout, so we widen as soon as one
+    // appears. Tool-category flips drive auto-resize (see below).
+    val isWide = pending.any { it.request.toolName in FILE_EDIT_TOOLS }
 
     val windowState = rememberWindowState(
         size = DpSize(POPOVER_WIDTH_DP.dp, POPOVER_HEIGHT_DP.dp),

@@ -20,7 +20,9 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.HorizontalDivider // used by FieldList
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.PrimaryScrollableTabRow
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -49,6 +51,8 @@ fun PopoverContent(
     onQuit: () -> Unit = {},
 ) {
     val pending by holder.pending.collectAsState()
+    val selectedId by holder.selectedId.collectAsState()
+    val selected = pending.firstOrNull { it.id == selectedId } ?: pending.firstOrNull()
     Surface(
         modifier = Modifier
             .fillMaxSize()
@@ -80,17 +84,40 @@ fun PopoverContent(
                 }
             }
             Spacer(Modifier.height(8.dp))
-            if (pending != null) {
-                RequestView(
-                    pending = pending!!,
-                    onAllow = holder::allow,
-                    onDeny = holder::deny,
-                )
-            } else {
+            if (pending.isEmpty() || selected == null) {
                 EmptyState()
+            } else {
+                if (pending.size > 1) {
+                    val selectedIndex = pending.indexOfFirst { it.id == selected.id }
+                        .coerceAtLeast(0)
+                    PrimaryScrollableTabRow(
+                        selectedTabIndex = selectedIndex,
+                        edgePadding = 0.dp,
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        pending.forEachIndexed { idx, p ->
+                            Tab(
+                                selected = idx == selectedIndex,
+                                onClick = { holder.selectTab(p.id) },
+                                text = { Text(tabLabel(idx, p)) },
+                            )
+                        }
+                    }
+                    Spacer(Modifier.height(8.dp))
+                }
+                RequestView(
+                    pending = selected,
+                    onAllow = { holder.allow(selected.id) },
+                    onDeny = { holder.deny(selected.id) },
+                )
             }
         }
     }
+}
+
+private fun tabLabel(index: Int, entry: PendingRequest): String {
+    val tool = entry.request.toolName
+    return "${index + 1}. $tool"
 }
 
 @Composable
