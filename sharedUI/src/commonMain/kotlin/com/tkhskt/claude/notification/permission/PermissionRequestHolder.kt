@@ -37,8 +37,9 @@ class PermissionRequestHolder {
     private val _pending = MutableStateFlow<List<PendingRequest>>(emptyList())
     val pending: StateFlow<List<PendingRequest>> = _pending.asStateFlow()
 
-    /** ID of the tab the UI currently shows. Auto-selects the first arrival
-     *  when it was previously null. Later arrivals don't steal selection. */
+    /** ID of the tab the UI currently shows. New arrivals always steal
+     *  selection so the popover shows the latest hook request — older
+     *  unresolved tabs remain reachable through the ProgressFooter. */
     private val _selectedId = MutableStateFlow<String?>(null)
     val selectedId: StateFlow<String?> = _selectedId.asStateFlow()
 
@@ -56,7 +57,10 @@ class PermissionRequestHolder {
         val deferred = CompletableDeferred<DecisionResult>()
         val entry = PendingRequest(id, request, fileLineOffset, deferred)
         _pending.update { it + entry }
-        _selectedId.update { current -> current ?: id }
+        // Always switch to the freshly-arrived request — what the user almost
+        // always wants is to see what just came in, not whatever stale tab
+        // they were looking at before.
+        _selectedId.value = id
         // Re-open the popover on every new arrival so the user notices.
         _popoverVisible.value = true
         val result: DecisionResult
