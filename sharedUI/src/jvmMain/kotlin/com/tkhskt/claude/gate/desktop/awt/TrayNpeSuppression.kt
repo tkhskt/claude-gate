@@ -1,4 +1,4 @@
-package com.tkhskt.claude.notification.desktop.awt
+package com.tkhskt.claude.gate.desktop.awt
 
 import java.awt.AWTEvent
 import java.awt.EventQueue

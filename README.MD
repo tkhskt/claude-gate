@@ -1,4 +1,4 @@
-# claude-notification
+# claude-gate
 
 macOS menu bar app that intercepts Claude Code permission prompts and lets you
 Allow / Deny from a popover without touching the terminal.
@@ -22,13 +22,13 @@ or AirDrop) macOS attaches a quarantine flag and Gatekeeper blocks the first
 launch — strip it after installing to `/Applications`:
 
 ```bash
-xattr -dr com.apple.quarantine /Applications/claude-notification.app
+xattr -dr com.apple.quarantine /Applications/claude-gate.app
 ```
 
 Locally built `.dmg`s don't have the quarantine flag, so this step is only
 needed for distribution.
 
-Runtime logs are written to `~/Library/Logs/claude-notification.log`
+Runtime logs are written to `~/Library/Logs/claude-gate.log`
 regardless of how the app was launched (terminal or Finder).
 
 ### Claude Code hooks
@@ -59,7 +59,7 @@ Add to `~/.claude/settings.json` (replace the absolute paths):
         "hooks": [
           {
             "type": "command",
-            "command": "/absolute/path/to/claude-notification/scripts/claude-menubar-hook.sh"
+            "command": "/absolute/path/to/claude-gate/scripts/claude-menubar-hook.sh"
           }
         ]
       }
@@ -69,7 +69,7 @@ Add to `~/.claude/settings.json` (replace the absolute paths):
         "hooks": [
           {
             "type": "command",
-            "command": "/absolute/path/to/claude-notification/scripts/claude-menubar-tool-resolved.sh"
+            "command": "/absolute/path/to/claude-gate/scripts/claude-menubar-tool-resolved.sh"
           }
         ]
       }
@@ -79,7 +79,7 @@ Add to `~/.claude/settings.json` (replace the absolute paths):
         "hooks": [
           {
             "type": "command",
-            "command": "/absolute/path/to/claude-notification/scripts/claude-menubar-tool-resolved.sh"
+            "command": "/absolute/path/to/claude-gate/scripts/claude-menubar-tool-resolved.sh"
           }
         ]
       }

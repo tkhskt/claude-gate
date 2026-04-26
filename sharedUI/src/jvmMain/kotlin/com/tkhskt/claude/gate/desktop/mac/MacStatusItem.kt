@@ -1,4 +1,4 @@
-package com.tkhskt.claude.notification.desktop.mac
+package com.tkhskt.claude.gate.desktop.mac
 
 import co.touchlab.kermit.Logger
 import com.sun.jna.Callback

@@ -1,4 +1,4 @@
-# claude-notification — 仕様
+# claude-gate — 仕様
 
 macOS メニューバー常駐アプリ。Claude Code の `PermissionRequest` フックから
 tool 実行の許可リクエストを横取りし、ターミナルを開かずにポップオーバー UI
@@ -25,7 +25,7 @@ tool 実行の許可リクエストを横取りし、ターミナルを開かず
 └────────────────────────┬──────────────────────────────┘
                          │ POST JSON
                          ↓
-┌──────── claude-notification プロセス (Compose Desktop) ────────┐
+┌──────── claude-gate プロセス (Compose Desktop) ────────┐
 │  HttpServer  127.0.0.1:44215                                   │
 │    ├─ Handler ──► PermissionRequestHolder.submit ─► deferred    │
 │    │                                                            │

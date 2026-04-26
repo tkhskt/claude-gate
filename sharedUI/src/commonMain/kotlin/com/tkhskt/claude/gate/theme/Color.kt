@@ -1,4 +1,4 @@
-package com.tkhskt.claude.notification.theme
+package com.tkhskt.claude.gate.theme
 
 import androidx.compose.ui.graphics.Color
 

@@ -1,4 +1,4 @@
-rootProject.name = "claude-notification"
+rootProject.name = "claude-gate"
 
 pluginManagement {
     repositories {

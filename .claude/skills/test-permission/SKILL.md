@@ -6,7 +6,7 @@ argument-hint: "[Bash|Edit|Monitor|NotebookEdit|PowerShell|WebFetch|WebSearch|Wr
 
 # test-permission
 
-このリポジトリ（claude-notification）の権限ハンドリング動作を確認するために、
+このリポジトリ（claude-gate）の権限ハンドリング動作を確認するために、
 permission ダイアログが立ち上がる無害なダミーのツール呼び出しを 1 回発行するスキル。
 
 ## 対応ツール

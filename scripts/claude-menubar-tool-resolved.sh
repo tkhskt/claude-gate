@@ -1,5 +1,5 @@
 #!/bin/bash
-# Claude Code PostToolUse / UserPromptSubmit hook for the claude-notification
+# Claude Code PostToolUse / UserPromptSubmit hook for the claude-gate
 # menu bar app. Notifies the running app that the permission has been
 # resolved (PostToolUse: tool ran after allow) or abandoned (UserPromptSubmit:
 # user moved on without deciding on the popover). The app uses these to

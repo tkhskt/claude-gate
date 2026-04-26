@@ -1,4 +1,4 @@
-package com.tkhskt.claude.notification.permission
+package com.tkhskt.claude.gate.permission
 
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable

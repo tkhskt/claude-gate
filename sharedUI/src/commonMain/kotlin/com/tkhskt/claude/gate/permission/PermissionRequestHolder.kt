@@ -1,4 +1,4 @@
-package com.tkhskt.claude.notification.permission
+package com.tkhskt.claude.gate.permission
 
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.flow.MutableStateFlow

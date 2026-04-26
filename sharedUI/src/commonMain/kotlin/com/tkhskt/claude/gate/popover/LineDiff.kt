@@ -1,4 +1,4 @@
-package com.tkhskt.claude.notification.popover
+package com.tkhskt.claude.gate.popover
 
 internal enum class DiffOp { EQUAL, DELETE, INSERT }
 

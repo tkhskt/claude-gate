@@ -1,4 +1,4 @@
-package com.tkhskt.claude.notification.desktop
+package com.tkhskt.claude.gate.desktop
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -14,12 +14,12 @@ import androidx.compose.ui.window.ApplicationScope
 import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.WindowPosition
 import androidx.compose.ui.window.rememberWindowState
-import com.tkhskt.claude.notification.desktop.mac.MacApp
-import com.tkhskt.claude.notification.desktop.mac.MacStatusItem
-import com.tkhskt.claude.notification.permission.PermissionRequestHolder
-import com.tkhskt.claude.notification.popover.PopoverContent
-import com.tkhskt.claude.notification.server.PermissionServer
-import com.tkhskt.claude.notification.theme.AppTheme
+import com.tkhskt.claude.gate.desktop.mac.MacApp
+import com.tkhskt.claude.gate.desktop.mac.MacStatusItem
+import com.tkhskt.claude.gate.permission.PermissionRequestHolder
+import com.tkhskt.claude.gate.popover.PopoverContent
+import com.tkhskt.claude.gate.server.PermissionServer
+import com.tkhskt.claude.gate.theme.AppTheme
 import kotlinx.coroutines.delay
 import javax.swing.SwingUtilities
 import java.awt.BasicStroke
@@ -34,7 +34,7 @@ import java.awt.event.MouseAdapter
 import java.awt.event.MouseEvent
 import java.awt.image.BufferedImage
 
-private const val POPOVER_TITLE = "Claude Notification"
+private const val POPOVER_TITLE = "Claude Gate"
 private const val POPOVER_WIDTH_DP = 360
 private const val POPOVER_HEIGHT_DP = 420
 private const val POPOVER_WIDE_WIDTH_DP = 680
@@ -219,7 +219,7 @@ fun ApplicationScope.DesktopApp() {
 private fun installTrayIcon(onClick: (Point) -> Unit): TrayIcon? {
     if (!SystemTray.isSupported()) return null
     val tray = runCatching { SystemTray.getSystemTray() }.getOrNull() ?: return null
-    val icon = TrayIcon(createTrayIconImage(TrayState.IDLE), "Claude Notification").apply {
+    val icon = TrayIcon(createTrayIconImage(TrayState.IDLE), "Claude Gate").apply {
         // keep the natural wider aspect ratio so the menu-bar slot grows to
         // match and the background color can occupy visible width.
         isImageAutoSize = false

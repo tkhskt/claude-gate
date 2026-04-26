@@ -1,4 +1,4 @@
-package com.tkhskt.claude.notification.theme
+package com.tkhskt.claude.gate.theme
 
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme

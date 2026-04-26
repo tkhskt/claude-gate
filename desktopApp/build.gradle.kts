@@ -16,7 +16,7 @@ compose.desktop {
 
         nativeDistributions {
             targetFormats(TargetFormat.Dmg, TargetFormat.Msi, TargetFormat.Deb)
-            packageName = "claude-notification"
+            packageName = "claude-gate"
             packageVersion = "1.0.0"
 
             linux {
@@ -27,7 +27,7 @@ compose.desktop {
             }
             macOS {
                 iconFile.set(project.file("appIcons/MacosIcon.icns"))
-                bundleID = "com.tkhskt.claude.notification.desktopApp"
+                bundleID = "com.tkhskt.claude.gate.desktopApp"
                 // Menu-bar agent: no Dock icon, no app-switcher entry.
                 infoPlist {
                     extraKeysRawXml = """

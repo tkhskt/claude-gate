@@ -1,9 +1,9 @@
-package com.tkhskt.claude.notification.server
+package com.tkhskt.claude.gate.server
 
 import co.touchlab.kermit.Logger
-import com.tkhskt.claude.notification.permission.HookResponse
-import com.tkhskt.claude.notification.permission.PermissionRequest
-import com.tkhskt.claude.notification.permission.PermissionRequestHolder
+import com.tkhskt.claude.gate.permission.HookResponse
+import com.tkhskt.claude.gate.permission.PermissionRequest
+import com.tkhskt.claude.gate.permission.PermissionRequestHolder
 import io.ktor.http.ContentType
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.cio.CIO

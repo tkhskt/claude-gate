@@ -1,5 +1,5 @@
 #!/bin/bash
-# Claude Code PermissionRequest hook for the claude-notification menu bar app.
+# Claude Code PermissionRequest hook for the claude-gate menu bar app.
 # Reads the hook JSON from stdin, forwards it to the running app's local HTTP
 # server, and echoes the server's JSON response back to Claude Code.
 # If the app is not running the hook exits silently so Claude falls back to
