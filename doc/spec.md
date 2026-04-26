@@ -133,8 +133,8 @@ tool 実行の許可リクエストを横取りし、ターミナルを開かず
 
 | Flow                                       | 意味 |
 |--------------------------------------------|------|
-| `pending: StateFlow<List<PendingRequest>>` | 同時並行で受け付けている全リクエスト。UI ではタブ列として描画 |
-| `selectedId: StateFlow<String?>`           | 現在選択中のタブ ID。新着到着時、未選択ならば自動でその ID を選択（既選択なら維持） |
+| `pending: StateFlow<List<PendingRequest>>` | 同時並行で受け付けている全リクエスト。UI では 1 件ずつ表示し、複数のときは `ProgressFooter` の dots / chevron で切替 |
+| `selectedId: StateFlow<String?>`           | 現在表示中のリクエスト ID。新着到着時、未選択ならば自動でその ID を選択（既選択なら維持） |
 | `popoverVisible: StateFlow<Boolean>`       | ポップオーバー表示中か。新着到着で必ず true に再セット |
 
 `PendingRequest` は `id`（"req-N" 形式、内部 Mutex で生成）/ `request` / `deferred` を持つ。
@@ -179,13 +179,13 @@ exchange に 200+JSON（USER / EXTERNAL いずれも）を書き戻す
 
 ### 5.3 並行リクエスト
 
-- **同時複数到着**: 並列に受け入れ、すべてを **タブとして同時表示**。ユーザーは任意のタブで Allow / Deny を独立に選択可。直列化（旧 `submitMutex`）は撤去。
-  - A 到着 → タブ1表示 → B 到着 → タブ2追加（選択は A のまま） → C 到着 → タブ3追加
-  - ユーザーが A を Allow → タブ1消滅、選択は B（先頭の残存）に遷移
-  - C を先に Deny → タブ3消滅、A/B はそのまま
+- **同時複数到着**: 並列に受け入れ、ユーザーは任意のリクエストで Allow / Deny を独立に選択可。直列化（旧 `submitMutex`）は撤去。表示は 1 件ずつ、`ProgressFooter` の dots / chevron で切替。
+  - A 到着 → A 表示 + フッター "REQUEST 1 OF 1" / フッター自体は単数なら非表示 → B 到着 → "REQUEST 1 OF 2" のフッター出現（表示は A のまま）→ C 到着 → "REQUEST 1 OF 3"
+  - ユーザーが A を Allow → A 消滅、表示は B（先頭の残存）に遷移
+  - C を先に Deny → C 消滅、A/B はそのまま
   - すべて解決されると `_pending` 空 → 最後のユーザー判定で popover が閉じる
 - **執行**: Ktor (CIO) のコルーチンディスパッチャで各ハンドラが並列に走る。各 `submit` は独立した `CompletableDeferred` を待つだけなので互いをブロックしない。
-- **応答の取り違えは発生しない**: 各 deferred は ID で正確に呼び分けられる（`allow(id)` / `deny(id)`）。タブを跨いだ誤判定は構造的に起きない。
+- **応答の取り違えは発生しない**: 各 deferred は ID で正確に呼び分けられる（`allow(id)` / `deny(id)`）。リクエストを跨いだ誤判定は構造的に起きない。
 
 ### 5.4 ユーザー操作
 
@@ -243,47 +243,89 @@ canJoinAllSpaces / window level 操作を試みたが、Space 切替時の一時
 
 ### 6.2 ポップオーバー状態切替
 
-| `pending`        | 表示                      |
-|------------------|---------------------------|
-| 空               | `EmptyState`（"Waiting for Claude…"） |
-| 1 件             | ヘッダー + `RequestView`（タブ列なし、`pending.size > 1` のときだけタブ列表示） |
-| 2 件以上         | ヘッダー + `PrimaryScrollableTabRow` + 選択中タブの `RequestView` |
+ポップオーバー全体は次の 3 段で構成される:
 
-タブのラベルは `"<順番>. <toolName>"` 形式（例: `"1. Edit"`）。タブクリックは `holder.selectTab(id)` を呼ぶ。Allow / Deny は選択中タブの ID に対して `holder.allow(id)` / `holder.deny(id)` を発火する。
+```
+┌──────────────────────────────────────────┐
+│ TopBar（高さ 48dp、下境界線）             │
+│   "Claude Code · <project> · <session>"  │
+│   右端: Quit（Power アイコン）            │
+├──────────────────────────────────────────┤
+│ Body（padding 24dp、空 or RequestView）  │
+├──────────────────────────────────────────┤
+│ ProgressFooter（pending.size > 1 のみ）  │
+│   左: dots + "REQUEST X OF N"            │
+│   右: prev/next chevron ボタン           │
+└──────────────────────────────────────────┘
+```
+
+| `pending`        | Body                          |
+|------------------|-------------------------------|
+| 空               | `EmptyState`（"Waiting for Claude…"） |
+| 1 件以上         | 選択中の `RequestView`         |
+
+複数 pending の切替は **タブ列廃止**。代わりに ProgressFooter の dots / chevron で 1 件ずつ移動する（`holder.selectTab(id)`）。Allow / Deny は選択中タブの ID に対して `holder.allow(id)` / `holder.deny(id)` を発火する。
+
+TopBar の `<project>` は `cwd` の最終セグメント、`<session>` は `session_id` の先頭 8 文字。どちらも該当値が無ければ省略。
 
 ### 6.3 `RequestView`
 
-- タイトル「Permission requested」（selection 外）。
-- `SelectionContainer` の中に:
-  - `LabeledLine`: Tool / cwd / Agent (`subagent_type` for Agent tool) / File（Edit/Write/Read/NotebookEdit はリポジトリ相対パス）
-  - `ToolInputBlock`
-- ボタン行（selection 外）: Deny（OutlinedButton）/ Allow（Button, primary）
-- Allow/Deny クリック時はポップオーバーを自動クローズ（`submit` の finally でクリア）。
+`Column { HeaderSection, PermissionCard, Spacer(weight=1f), Actions }`。
 
-### 6.4 `ToolInputBlock`
+- **HeaderSection**: 40×40 のティール (`#009688`) アイコン枠 + `ToolGlyph` + 「Permission Request」タイトル + `headerSubtitleFor(toolName)` のサブテキスト
+- **PermissionCard**（`SelectionContainer` 内、選択コピー対象）:
+  - メタデータ行: `TOOL` ラベル + `<TOOL_NAME>` バッジ（ティール薄塗り）
+  - セカンダリ行: ファイルパス（Edit/Write/Read/NotebookEdit、リポジトリ相対）/ コマンド（Bash, PowerShell）/ URL（WebFetch）/ クエリ（WebSearch）/ subagent 名（Agent）。該当が無ければ省略
+  - `CodeDiffBlock` または `FieldList` を本体として配置
+- **Actions**（selection 外）: 左に「Allow Change」（ティール塗り `Button`、Check アイコン）、右に「Deny」（淡い灰色 `OutlinedButton`、Deny アイコン）
 
-```
-Edit       → File 行 + compactDiff(old→new) を DiffBlock、残りのフィールドを FieldList
-Write      → File 行 + content を全行 INSERT 扱いで DiffBlock
-NotebookEdit → File 行 + new_source を全行 INSERT で DiffBlock、残りを FieldList
-それ以外   → FieldList のみ
-```
+Allow / Deny クリック時はポップオーバーを自動クローズ（`submit` の finally でクリア）。
 
-### 6.5 `DiffBlock`
+### 6.4 `ToolInputBlock`（旧称）→ `CodeDiffBlock` + `FieldList` の組合せ
 
-- 行番号カラム（DELETE=旧ファイル行番号、INSERT/EQUAL=新ファイル行番号）
-- プレフィックス: `+` (INSERT, 緑背景) / `−` (DELETE, 赤背景) / ` ` (EQUAL, 無色)
-- コンテキスト: 変更の前後 3 行だけ表示、それ以上離れた連続 EQUAL は `⋯ @@ −N +M @@` バナーで省略
-- フォント: Monospace / bodySmall
-- 横スクロール対応
+`PermissionCard` 内で 1 件のリクエストに対し、ツールごとに以下を表示:
+
+| Tool                 | CodeDiffBlock                                       | FieldList の残り |
+|----------------------|-----------------------------------------------------|------------------|
+| Edit                 | `compactDiff(old→new)`（タイトル「<filename> — Diff」、`+N -N` カウンタ） | 0 件             |
+| Write                | content 全行を INSERT 扱い（タイトル「<filename> — Write」） | 0 件             |
+| NotebookEdit         | new_source 全行を INSERT（タイトル「<filename> — Cell」） | 0 件             |
+| Bash / PowerShell    | command が複数行の場合のみ Plain ブロック表示                | command 以外     |
+| WebFetch             | prompt が非空なら Plain ブロック                         | url / prompt 以外 |
+| WebSearch            | なし                                                 | query 以外       |
+| その他               | なし                                                 | toolInput 全体   |
+
+セカンダリ行で 1 行で示せる情報（パス／URL／query／単行 command）は CodeDiffBlock を出さず、メタデータ行直下に折り畳む。
+
+### 6.5 `CodeDiffBlock`
+
+- 外枠: 黒背景 `#1E1E1E`、角丸 8dp
+- 上部バー: `#2D2D2D`、`<filename> — Diff` などのタイトル、右端に `+N` (`#5EEAD4`) と `-N` (`#FCA5A5`) カウンタ
+- Body（Diff の場合）:
+  - 行番号カラム（DELETE=旧ファイル行番号、INSERT/EQUAL=新ファイル行番号）— **常に左端**
+  - プレフィックス: `+` (INSERT, 緑系背景 `#4D134E4A`) / `-` (DELETE, 赤系背景 `#4D7F1D1D`) / ` ` (EQUAL, 透過)
+  - 順序は **行番号 → +/- → 内容**（Figma の「+/- → 行番号 → 内容」とは別、現行 UX を維持）
+  - コンテキスト: 変更の前後 3 行だけ表示、それ以上離れた連続 EQUAL は ` ⋯ @@ -N +M @@` バナーで省略
+  - フォント: Monospace 12sp、横スクロール対応
+- Body（Plain の場合）: 単純な monospace テキストブロック（横スクロール）
 
 ### 6.6 `FieldList`
 
-- Surface 内に key/value 行を縦積み、行間に `HorizontalDivider`（onSurfaceVariant × 0.25）
-- ラベル: 10sp / uppercase / letter-spacing 1.2sp / SemiBold / muted 色
-- 値: 14sp `bodyMedium`
-- 複数行文字列 / JsonObject / JsonArray は CodeBlock（背景色・横スクロール・monospace）
-- `consumedKeys(toolName)` で既に他所で表示済みのキーは除外
+- 白背景 + `#BFC9C7` 枠の `Surface`、角丸 6dp。key/value 行を縦積み、行間に `HorizontalDivider`
+- ラベル: 10sp / uppercase / letter-spacing 1sp / SemiBold / `#3F4947`
+- 値: 13sp プレーンテキスト
+- 複数行文字列 / JsonObject / JsonArray は `CodeDiffBlock`（Plain モード）で表示
+- `consumedKeys(toolName)` で既に他所（メタデータ行・diff・command/url 等）に表示済みのキーは除外
+
+### 6.7 `ProgressFooter`（pending.size > 1 のみ表示）
+
+- 上境界線 `#BFC9C7`、背景 `rgba(243,243,245,0.5)`、padding 24/16
+- 左ブロック:
+  - dots: 選択中は 12×6 のティール pill、その他は 6×6 の灰色 (`rgba(63,73,71,0.2)`) ドット。クリックで該当タブに移動
+  - 「REQUEST X OF N」ラベル（11sp / Bold / uppercase / letter-spacing 1.1sp）
+- 右ブロック:
+  - 32×32 の白枠 chevron ボタン（prev / next）。先頭/末尾では半透明オーバーレイで disabled 表現
+  - クリックで `holder.selectTab(prev/next id)`
 
 ## 7. タイムアウト
 

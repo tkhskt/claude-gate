@@ -174,6 +174,11 @@ fun ApplicationScope.DesktopApp() {
             // key (canBecomeKeyWindow = NO), so WindowFocusListener isn't
             // reliable — we treat app-level activation as the source of truth.
             MacApp.activateApp()
+            // Round the underlying NSWindow's contentView layer. Compose's
+            // `transparent = true` doesn't clip the AWT contentView, so without
+            // this the window edges stay visibly square. Re-applied on every
+            // re-show because the contentView may be recreated.
+            MacApp.roundPopoverWindow(POPOVER_TITLE, radius = 12.0)
             window.toFront()
             window.requestFocus()
 

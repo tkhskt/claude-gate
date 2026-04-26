@@ -2,6 +2,7 @@ package com.tkhskt.claude.notification.desktop.mac
 
 import co.touchlab.kermit.Logger
 import com.sun.jna.Callback
+import com.sun.jna.Memory
 import com.sun.jna.NativeLibrary
 import com.sun.jna.Pointer
 import java.util.concurrent.ConcurrentLinkedQueue
@@ -84,6 +85,64 @@ object MacApp {
                 val nsApp = msg.invokePointer(arrayOf(nsAppClass, sharedApplication))
                 msg.invokeVoid(arrayOf(nsApp, activateSel, 1L))
             }.onFailure { t -> log.w(t) { "activateApp failed" } }
+        }
+    }
+
+    /**
+     * Round the popover NSWindow's contentView layer to [radius] pt. Matches
+     * the window by [title] in `[NSApp windows]`. Compose Desktop's
+     * `transparent = true` clears the window background but doesn't clip the
+     * contentView, so without this the AWT window stays visibly square even
+     * when the inner Compose Surface is rounded.
+     */
+    fun roundPopoverWindow(title: String, radius: Double) {
+        if (!isMac) return
+        val msg = objcMsgSend ?: return
+        runOnAppKitMain {
+            runCatching {
+                val nsAppClass = cls("NSApplication") ?: return@runCatching
+                val nsStringClass = cls("NSString") ?: return@runCatching
+                val sharedApplication = sel("sharedApplication") ?: return@runCatching
+                val windowsSel = sel("windows") ?: return@runCatching
+                val countSel = sel("count") ?: return@runCatching
+                val objectAtIndexSel = sel("objectAtIndex:") ?: return@runCatching
+                val titleSel = sel("title") ?: return@runCatching
+                val isEqualToStringSel = sel("isEqualToString:") ?: return@runCatching
+                val contentViewSel = sel("contentView") ?: return@runCatching
+                val setWantsLayerSel = sel("setWantsLayer:") ?: return@runCatching
+                val layerSel = sel("layer") ?: return@runCatching
+                val setCornerRadiusSel = sel("setCornerRadius:") ?: return@runCatching
+                val setMasksToBoundsSel = sel("setMasksToBounds:") ?: return@runCatching
+                val setOpaqueSel = sel("setOpaque:") ?: return@runCatching
+                val setBackgroundColorSel = sel("setBackgroundColor:") ?: return@runCatching
+                val nsColorClass = cls("NSColor") ?: return@runCatching
+                val clearColorSel = sel("clearColor") ?: return@runCatching
+                val stringWithUTF8Sel = sel("stringWithUTF8String:") ?: return@runCatching
+
+                val cBytes = title.toByteArray(Charsets.UTF_8) + 0
+                val cMem = Memory(cBytes.size.toLong())
+                cMem.write(0, cBytes, 0, cBytes.size)
+                val nsTitle = msg.invokePointer(arrayOf(nsStringClass, stringWithUTF8Sel, cMem))
+                val clearColor = msg.invokePointer(arrayOf(nsColorClass, clearColorSel))
+
+                val nsApp = msg.invokePointer(arrayOf(nsAppClass, sharedApplication))
+                val windowsArr = msg.invokePointer(arrayOf(nsApp, windowsSel))
+                val count = msg.invokeLong(arrayOf(windowsArr, countSel))
+                for (i in 0L until count) {
+                    val w = msg.invokePointer(arrayOf(windowsArr, objectAtIndexSel, i))
+                    val wTitle = msg.invokePointer(arrayOf(w, titleSel))
+                    if (wTitle == null || wTitle == Pointer.NULL) continue
+                    val isMatch = msg.invokeLong(arrayOf(wTitle, isEqualToStringSel, nsTitle)) and 0xFFL != 0L
+                    if (!isMatch) continue
+                    msg.invokeVoid(arrayOf(w, setOpaqueSel, 0L))
+                    msg.invokeVoid(arrayOf(w, setBackgroundColorSel, clearColor))
+                    val contentView = msg.invokePointer(arrayOf(w, contentViewSel))
+                    msg.invokeVoid(arrayOf(contentView, setWantsLayerSel, 1L))
+                    val layer = msg.invokePointer(arrayOf(contentView, layerSel))
+                    msg.invokeVoid(arrayOf(layer, setCornerRadiusSel, radius))
+                    msg.invokeVoid(arrayOf(layer, setMasksToBoundsSel, 1L))
+                }
+            }.onFailure { t -> log.w(t) { "roundPopoverWindow failed" } }
         }
     }
 
