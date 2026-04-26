@@ -28,8 +28,10 @@ xattr -dr com.apple.quarantine /Applications/claude-gate.app
 Locally built `.dmg`s don't have the quarantine flag, so this step is only
 needed for distribution.
 
-Runtime logs are written to `~/Library/Logs/claude-gate.log`
-regardless of how the app was launched (terminal or Finder).
+Runtime logs go to standard output / standard error. Launch via
+`./gradlew :desktopApp:run` to see them in the terminal. Finder/Launchpad
+launches inherit the OS's stdout (effectively dropped) — run from a terminal
+when diagnosing.
 
 ### Claude Code hooks
 
