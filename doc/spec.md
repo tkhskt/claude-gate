@@ -21,7 +21,7 @@ tool 実行の許可リクエストを横取りし、ターミナルを開かず
 ┌──────────────── Claude Code プロセス ────────────────┐
 │  PermissionRequest 発火                               │
 │    ↓                                                  │
-│  scripts/claude-menubar-hook.sh (curl, no timeout)    │
+│  plugins/claude-gate/scripts/claude-menubar-hook.sh (curl, no timeout)    │
 └────────────────────────┬──────────────────────────────┘
                          │ POST JSON
                          ↓
@@ -59,8 +59,8 @@ tool 実行の許可リクエストを横取りし、ターミナルを開かず
 | `sharedUI/.../desktop/mac/MacStatusItem.kt`                                       | `NSStatusItem` を JNA 直叩き。`button.layer.backgroundColor` でメニューバーの highlight 領域全体を塗る。runtime obj-c class でクリック target/action を実装 |
 | `sharedUI/.../desktop/awt/TrayNpeSuppression.kt`                                  | JDK の TrayIcon→LightweightDispatcher NPE を黙らせる EventQueue shim（AWT フォールバック時のみ意味あり） |
 | `desktopApp/src/main/kotlin/main.kt`                                              | エントリポイント |
-| `scripts/claude-menubar-hook.sh`                                                  | `PermissionRequest` hook 用 shell。curl で `/permission-request` に POST。失敗時 / 空応答時は exit 0 で Claude のフォールバックに委ねる |
-| `scripts/claude-menubar-tool-resolved.sh`                                         | `PostToolUse` / `UserPromptSubmit` hook 用 shell。`/tool-resolved` に POST して popover 解決を通知。常に空 stdout で Claude のフローには影響しない |
+| `plugins/claude-gate/scripts/claude-menubar-hook.sh`                                                  | `PermissionRequest` hook 用 shell。curl で `/permission-request` に POST。失敗時 / 空応答時は exit 0 で Claude のフォールバックに委ねる |
+| `plugins/claude-gate/scripts/claude-menubar-tool-resolved.sh`                                         | `PostToolUse` / `UserPromptSubmit` hook 用 shell。`/tool-resolved` に POST して popover 解決を通知。常に空 stdout で Claude のフローには影響しない |
 
 ## 4. Claude Code フック統合
 
@@ -98,6 +98,32 @@ tool 実行の許可リクエストを横取りし、ターミナルを開かず
 
 ### 4.3 セットアップ（ユーザー側）
 
+#### 推奨: プラグインマーケットプレイス経由
+
+このリポジトリ自体が `.claude-plugin/marketplace.json` を持つマーケットプレイス
+として機能する。`/plugin install` で必要な hook 3 種が一括登録される（
+ユーザーが `~/.claude/settings.json` を編集する必要なし）。
+
+```shell
+/plugin marketplace add tkhskt/claude-gate
+/plugin install claude-gate@claude-gate
+```
+
+プラグインは hook の登録だけを行う。デスクトップアプリ本体は別途
+`./gradlew :desktopApp:packageDistributionForCurrentOS` でビルドして
+`/Applications` に配置する必要がある。
+
+レイアウト:
+
+| パス | 役割 |
+|-----|------|
+| `.claude-plugin/marketplace.json` | マーケットプレイスカタログ。`./plugins/claude-gate` を相対パスで指す |
+| `plugins/claude-gate/.claude-plugin/plugin.json` | プラグインマニフェスト |
+| `plugins/claude-gate/hooks/hooks.json` | 3 hook の `command` 定義。`${CLAUDE_PLUGIN_ROOT}/scripts/...` 経由で同梱スクリプトを参照 |
+| `plugins/claude-gate/scripts/*.sh` | hook 本体（curl で localhost にフォワード） |
+
+#### 手動セットアップ（プラグイン非利用時）
+
 `~/.claude/settings.json`:
 ```json
 {
@@ -105,21 +131,21 @@ tool 実行の許可リクエストを横取りし、ターミナルを開かず
     "PermissionRequest": [
       {
         "hooks": [
-          { "type": "command", "command": "/absolute/path/to/scripts/claude-menubar-hook.sh" }
+          { "type": "command", "command": "/absolute/path/to/plugins/claude-gate/scripts/claude-menubar-hook.sh" }
         ]
       }
     ],
     "PostToolUse": [
       {
         "hooks": [
-          { "type": "command", "command": "/absolute/path/to/scripts/claude-menubar-tool-resolved.sh" }
+          { "type": "command", "command": "/absolute/path/to/plugins/claude-gate/scripts/claude-menubar-tool-resolved.sh" }
         ]
       }
     ],
     "UserPromptSubmit": [
       {
         "hooks": [
-          { "type": "command", "command": "/absolute/path/to/scripts/claude-menubar-tool-resolved.sh" }
+          { "type": "command", "command": "/absolute/path/to/plugins/claude-gate/scripts/claude-menubar-tool-resolved.sh" }
         ]
       }
     ]
@@ -343,7 +369,7 @@ Allow / Deny クリック時はポップオーバーを自動クローズ（`sub
 - `UserPromptSubmit` 経由 `resolveExternally(DENY)` — popover を放置して次プロンプトを送ったケース
 - アプリ Quit / クラッシュ → curl が連動して切れ、Claude は hook 失敗扱いでフォールバック
 
-`PermissionRequestHolder` には `withTimeout` を入れていないため、popover を考え込んでいる間に勝手にフォールバックする心配はない。`scripts/claude-menubar-hook.sh` も `curl --max-time` を指定せず、無期限待機。
+`PermissionRequestHolder` には `withTimeout` を入れていないため、popover を考え込んでいる間に勝手にフォールバックする心配はない。`plugins/claude-gate/scripts/claude-menubar-hook.sh` も `curl --max-time` を指定せず、無期限待機。
 
 セキュリティ: 自動 allow / deny は一切行わない。すべての解決はユーザー操作か外部 hook イベント由来。
 

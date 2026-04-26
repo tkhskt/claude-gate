@@ -1,0 +1,16 @@
+{
+  "name": "claude-gate",
+  "owner": {
+    "name": "tkhskt"
+  },
+  "metadata": {
+    "description": "macOS menubar app that intercepts Claude Code permission requests and lets you Allow / Deny from a popover"
+  },
+  "plugins": [
+    {
+      "name": "claude-gate",
+      "source": "./plugins/claude-gate",
+      "description": "Wire Claude Code's PermissionRequest / PostToolUse / UserPromptSubmit hooks to the claude-gate menubar app"
+    }
+  ]
+}

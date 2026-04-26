@@ -1,0 +1,8 @@
+{
+  "name": "claude-gate",
+  "description": "Routes Claude Code permission prompts to the claude-gate macOS menubar app so you can Allow / Deny from a popover instead of the terminal.",
+  "author": {
+    "name": "tkhskt"
+  },
+  "homepage": "https://github.com/tkhskt/claude-gate"
+}

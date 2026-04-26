@@ -33,19 +33,37 @@ Runtime logs go to standard output / standard error. Launch via
 launches inherit the OS's stdout (effectively dropped) — run from a terminal
 when diagnosing.
 
-### Claude Code hooks
+### Claude Code hooks (recommended: install the marketplace plugin)
 
-Register two hooks so the app receives both permission requests and the
-"tool is about to execute" signal:
+This repository doubles as a Claude Code plugin marketplace. Installing the
+`claude-gate` plugin auto-registers the three hooks against bundled scripts —
+no manual `~/.claude/settings.json` edits.
 
-- `scripts/claude-menubar-hook.sh` — `PermissionRequest`. Forwards the request
-  to the running app and returns its Allow/Deny decision.
-- `scripts/claude-menubar-tool-resolved.sh` — `PostToolUse` /
-  `UserPromptSubmit`. `PostToolUse` clears the popover after the tool
-  has actually run (i.e. the request was approved somewhere).
+```shell
+/plugin marketplace add tkhskt/claude-gate
+/plugin install claude-gate@claude-gate
+```
+
+The plugin only wires up the hooks. Build and run the desktop app separately
+(see above). When Claude Code asks for permission, the popover opens below
+the menu bar icon; click **Allow** to allow or **Deny** to deny. If the menu
+bar app is not running, the hook exits silently and Claude Code falls back
+to its default terminal prompt.
+
+### Hooks (manual setup, alternative)
+
+If you'd rather wire the hooks by hand instead of installing the plugin, the
+scripts ship at `plugins/claude-gate/scripts/`:
+
+- `plugins/claude-gate/scripts/claude-menubar-hook.sh` — `PermissionRequest`.
+  Forwards the request to the running app and returns its Allow/Deny
+  decision.
+- `plugins/claude-gate/scripts/claude-menubar-tool-resolved.sh` —
+  `PostToolUse` / `UserPromptSubmit`. `PostToolUse` clears the popover after
+  the tool has actually run (i.e. the request was approved somewhere).
   `UserPromptSubmit` covers every other "the user moved on" case — most
-  importantly the manual terminal-deny path, for which Claude Code fires
-  no tool-level signal at all (see
+  importantly the manual terminal-deny path, for which Claude Code fires no
+  tool-level signal at all (see
   [anthropics/claude-code#37769](https://github.com/anthropics/claude-code/issues/37769)).
   The hook never influences Claude's flow. (`PreToolUse`, `PermissionDenied`,
   `Stop`, and `PostToolUseFailure` were tested and dropped: too early,
@@ -61,7 +79,7 @@ Add to `~/.claude/settings.json` (replace the absolute paths):
         "hooks": [
           {
             "type": "command",
-            "command": "/absolute/path/to/claude-gate/scripts/claude-menubar-hook.sh"
+            "command": "/absolute/path/to/claude-gate/plugins/claude-gate/scripts/claude-menubar-hook.sh"
           }
         ]
       }
@@ -71,7 +89,7 @@ Add to `~/.claude/settings.json` (replace the absolute paths):
         "hooks": [
           {
             "type": "command",
-            "command": "/absolute/path/to/claude-gate/scripts/claude-menubar-tool-resolved.sh"
+            "command": "/absolute/path/to/claude-gate/plugins/claude-gate/scripts/claude-menubar-tool-resolved.sh"
           }
         ]
       }
@@ -81,7 +99,7 @@ Add to `~/.claude/settings.json` (replace the absolute paths):
         "hooks": [
           {
             "type": "command",
-            "command": "/absolute/path/to/claude-gate/scripts/claude-menubar-tool-resolved.sh"
+            "command": "/absolute/path/to/claude-gate/plugins/claude-gate/scripts/claude-menubar-tool-resolved.sh"
           }
         ]
       }
@@ -89,11 +107,6 @@ Add to `~/.claude/settings.json` (replace the absolute paths):
   }
 }
 ```
-
-When Claude Code asks for permission, the popover opens below the menu bar
-icon; click **許可** to allow or **却下** to deny. If the menu bar app is not
-running, the hook exits silently and Claude Code falls back to its default
-terminal prompt.
 
 The app exposes the following endpoints on `127.0.0.1:44215` (loopback only,
 nothing bound outside localhost):
