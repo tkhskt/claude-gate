@@ -206,6 +206,7 @@ exchange に 200+JSON（USER / EXTERNAL いずれも）を書き戻す
 |--------------------|----|
 | サイズ（初期）     | 360×420 dp（narrow）、Edit/Write 時 680×620 dp（wide、`isWide` トリガ） |
 | サイズ（変化）     | tool カテゴリ narrow↔wide 切替時のみ自動適用。ユーザーの手動リサイズは保持 |
+| サイズ（最小）     | 420×420 dp（`window.minimumSize` を Compose `Window` の content スコープ内で `ComposeWindow` に直接設定）。Allow/Deny ボタン行のラベル折り返しを防ぐ下限 |
 | 位置               | アンカー優先度: ①トレイクリック時の `MouseEvent.locationOnScreen` キャッシュ → ②`MacStatusItem.statusItemScreenCenterX()`（`[NSStatusItem.button.window frame]` を JNA 経由で読み取りキャッシュ、auto-open 時にメニューバーアイコン直下へ揃える）→ ③画面右上フォールバック |
 | 装飾               | `undecorated = true, transparent = true, alwaysOnTop = true, focusable = true` |
 | 表示制御           | `renderVisible` を `visibleTarget` から 1 tick 遅らせ、位置確定後に true（初回表示のチラつき抑止） |
@@ -277,7 +278,7 @@ TopBar の `<project>` は `cwd` の最終セグメント、`<session>` は `ses
   - メタデータ行: `TOOL` ラベル + `<TOOL_NAME>` バッジ（ティール薄塗り）
   - セカンダリ行: ファイルパス（Edit/Write/Read/NotebookEdit、リポジトリ相対）/ コマンド（Bash, PowerShell）/ URL（WebFetch）/ クエリ（WebSearch）/ subagent 名（Agent）。該当が無ければ省略
   - `CodeDiffBlock` または `FieldList` を本体として配置
-- **Actions**（selection 外）: 左に「Allow Change」（ティール塗り `Button`、Check アイコン）、右に「Deny」（淡い灰色 `OutlinedButton`、Deny アイコン）
+- **Actions**（selection 外）: 左に「Allow」（ティール塗り `Button`、Check アイコン）、右に「Deny」（淡い灰色 `OutlinedButton`、Deny アイコン）
 
 Allow / Deny クリック時はポップオーバーを自動クローズ（`submit` の finally でクリア）。
 

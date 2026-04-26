@@ -357,7 +357,7 @@ private fun Actions(onAllow: () -> Unit, onDeny: () -> Unit) {
             CheckCircleIcon(modifier = Modifier.size(16.dp), color = Color.White)
             Spacer(Modifier.width(8.dp))
             Text(
-                text = "Allow Change",
+                text = "Allow",
                 fontSize = 14.sp,
                 fontWeight = FontWeight.SemiBold,
             )

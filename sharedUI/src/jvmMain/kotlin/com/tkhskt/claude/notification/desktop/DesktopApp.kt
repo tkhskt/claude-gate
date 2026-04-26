@@ -24,6 +24,7 @@ import kotlinx.coroutines.delay
 import javax.swing.SwingUtilities
 import java.awt.BasicStroke
 import java.awt.Color
+import java.awt.Dimension
 import java.awt.GraphicsEnvironment
 import java.awt.Point
 import java.awt.RenderingHints
@@ -38,6 +39,11 @@ private const val POPOVER_WIDTH_DP = 360
 private const val POPOVER_HEIGHT_DP = 420
 private const val POPOVER_WIDE_WIDTH_DP = 680
 private const val POPOVER_WIDE_HEIGHT_DP = 620
+// Floor for manual resize: at smaller widths the Allow / Deny row wraps and
+// the button label gets clipped (see screenshot in PR thread).  Matches the
+// narrow preset so the user can never resize below the default layout.
+private const val POPOVER_MIN_WIDTH_DP = 360
+private const val POPOVER_MIN_HEIGHT_DP = 420
 private const val MENU_BAR_OFFSET_DP = 28
 private const val SCREEN_EDGE_MARGIN_DP = 8
 private const val TRAY_ICON_WIDTH = 22
@@ -167,6 +173,7 @@ fun ApplicationScope.DesktopApp() {
         focusable = true,
         title = POPOVER_TITLE,
     ) {
+        window.minimumSize = Dimension(POPOVER_MIN_WIDTH_DP, POPOVER_MIN_HEIGHT_DP)
         LaunchedEffect(renderVisible) {
             if (!renderVisible) return@LaunchedEffect
             // Pull the process to the foreground so NSApp.isActive becomes the
