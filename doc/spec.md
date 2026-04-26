@@ -278,7 +278,7 @@ TopBar の `<project>` は `cwd` の最終セグメント、`<session>` は `ses
   - メタデータ行: `TOOL` ラベル + `<TOOL_NAME>` バッジ（ティール薄塗り）
   - セカンダリ行: ファイルパス（Edit/Write/Read/NotebookEdit、リポジトリ相対）/ URL（WebFetch）/ クエリ（WebSearch）/ subagent 名（Agent）。該当が無ければ省略。Bash/PowerShell の command は Plain `CodeBlockSpec` 側で表示するためセカンダリ行には出さない
   - `CodeDiffBlock` または `FieldList` を本体として配置
-- **Actions**（selection 外）: 左に「Allow」（ティール塗り `Button`、Check アイコン）、右に「Deny」（淡い灰色 `OutlinedButton`、Deny アイコン）
+- **Actions**（selection 外）: 左に「Deny」（淡い灰色 `OutlinedButton`、Deny アイコン）、右に「Allow」（ティール塗り `Button`、Check アイコン）。macOS HIG / システム permission prompt の「肯定アクションは右」慣習に合わせた配置
 
 Allow / Deny クリック時はポップオーバーを自動クローズ（`submit` の finally でクリア）。
 

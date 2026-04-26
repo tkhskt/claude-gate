@@ -345,23 +345,6 @@ private fun Actions(onAllow: () -> Unit, onDeny: () -> Unit) {
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        Button(
-            onClick = onAllow,
-            modifier = Modifier.weight(1f).height(44.dp),
-            shape = RoundedCornerShape(8.dp),
-            colors = ButtonDefaults.buttonColors(
-                containerColor = Brand,
-                contentColor = Color.White,
-            ),
-        ) {
-            CheckCircleIcon(modifier = Modifier.size(16.dp), color = Color.White)
-            Spacer(Modifier.width(8.dp))
-            Text(
-                text = "Allow",
-                fontSize = 14.sp,
-                fontWeight = FontWeight.SemiBold,
-            )
-        }
         OutlinedButton(
             onClick = onDeny,
             modifier = Modifier.weight(1f).height(44.dp),
@@ -376,6 +359,23 @@ private fun Actions(onAllow: () -> Unit, onDeny: () -> Unit) {
             Spacer(Modifier.width(8.dp))
             Text(
                 text = "Deny",
+                fontSize = 14.sp,
+                fontWeight = FontWeight.SemiBold,
+            )
+        }
+        Button(
+            onClick = onAllow,
+            modifier = Modifier.weight(1f).height(44.dp),
+            shape = RoundedCornerShape(8.dp),
+            colors = ButtonDefaults.buttonColors(
+                containerColor = Brand,
+                contentColor = Color.White,
+            ),
+        ) {
+            CheckCircleIcon(modifier = Modifier.size(16.dp), color = Color.White)
+            Spacer(Modifier.width(8.dp))
+            Text(
+                text = "Allow",
                 fontSize = 14.sp,
                 fontWeight = FontWeight.SemiBold,
             )
