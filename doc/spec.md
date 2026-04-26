@@ -161,7 +161,8 @@ tool 実行の許可リクエストを横取りし、ターミナルを開かず
 |--------------------------------------------|------|
 | `pending: StateFlow<List<PendingRequest>>` | 同時並行で受け付けている全リクエスト。UI では 1 件ずつ表示し、複数のときは `ProgressFooter` の dots / chevron で切替 |
 | `selectedId: StateFlow<String?>`           | 現在表示中のリクエスト ID。新着到着時は **常に** その ID に切替（hook 由来の最新パーミッションリクエストを即時表示。古い未解決タブは ProgressFooter の dots/chevron から到達可） |
-| `popoverVisible: StateFlow<Boolean>`       | ポップオーバー表示中か。新着到着で必ず true に再セット |
+| `popoverVisible: StateFlow<Boolean>`       | ポップオーバー表示中か。新着到着で `muted = false` のときのみ true に再セット |
+| `muted: StateFlow<Boolean>`                | ミュート状態。true の間は新着到着でも `popoverVisible` を true に上書きしない（リクエストは `_pending` に積まれ、トレイアイコンも AWAITING になるので、ユーザーはトレイクリックで後からまとめて処理できる）。`toggleMuted()` で切替、TopBar のベルアイコンが UI |
 
 `PendingRequest` は `id`（"req-N" 形式、内部 Mutex で生成）/ `request` / `fileLineOffset`（Edit 用、CodeDiffBlock の行番号を実ファイル基準に揃える 0-based オフセット）/ `deferred` を持つ。
 
@@ -221,6 +222,7 @@ exchange に 200+JSON（USER / EXTERNAL いずれも）を書き戻す
 | Allow                             | `hookSpecificOutput.decision.behavior = "allow"` 返却 |
 | Deny                              | `behavior = "deny"` + `message = "Denied from menu bar app"` 返却 |
 | ポップオーバー外クリック          | アプリ非アクティブ化 → ポーリングが検知 → `setPopoverVisible(false)`。`_pending` は残るため再度トレイクリックで復帰可 |
+| Mute トグル（Bell アイコン）       | `holder.toggleMuted()`。ON 中は新着リクエストで popover 自動オープンしない。pending リスト・トレイアイコン AWAITING は通常通り更新されるので、トレイ手動クリックでまとめて処理可能 |
 | Quit ボタン                       | `kotlin.system.exitProcess(0)` |
 | Dismiss ボタン（TimeoutView）     | `dismissTimeout()` で `_lastTimeout` クリア、通常状態へ |
 | テキストドラッグ選択 + Cmd+C      | リクエスト本文（Tool / cwd / Agent / File / tool_input）がコピー可能。ヘッダー・ボタン等 UI chrome は選択外 |
@@ -300,6 +302,8 @@ canJoinAllSpaces / window level 操作を試みたが、Space 切替時の一時
 複数 pending の切替は **タブ列廃止**。代わりに ProgressFooter の dots / chevron で 1 件ずつ移動する（`holder.selectTab(id)`）。Allow / Deny は選択中タブの ID に対して `holder.allow(id)` / `holder.deny(id)` を発火する。
 
 TopBar の `<project>` は `cwd` の最終セグメント、`<session>` は `session_id` の先頭 8 文字。どちらも該当値が無ければ省略。
+
+TopBar 右側には Quit（Power アイコン）の左にミュートトグル（Bell アイコン）が並ぶ。ミュート ON の状態ではベルに斜線が入りブランド色（`Brand`）でハイライト、OFF では `TextSecondary` のニュートラル色。クリックで `holder.toggleMuted()` を発火。
 
 popover 全体の境界は `BorderStroke` を廃止し、`MacApp.roundPopoverWindow`
 で `[NSWindow setHasShadow:YES]` を有効化することで macOS ネイティブの

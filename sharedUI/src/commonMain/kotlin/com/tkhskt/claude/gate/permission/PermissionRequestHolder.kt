@@ -46,6 +46,16 @@ class PermissionRequestHolder {
     private val _popoverVisible = MutableStateFlow(false)
     val popoverVisible: StateFlow<Boolean> = _popoverVisible.asStateFlow()
 
+    /**
+     * When true, hook arrivals are queued silently — `_popoverVisible` is
+     * NOT flipped to true on `submit()`, so the user can keep working
+     * uninterrupted. Pending requests still accumulate in `_pending`,
+     * the tray icon still flips to AWAITING, and the user can pop the
+     * window manually via the tray icon to process the backlog later.
+     */
+    private val _muted = MutableStateFlow(false)
+    val muted: StateFlow<Boolean> = _muted.asStateFlow()
+
     private val idMutex = Mutex()
     private var idCounter = 0L
 
@@ -61,8 +71,12 @@ class PermissionRequestHolder {
         // always wants is to see what just came in, not whatever stale tab
         // they were looking at before.
         _selectedId.value = id
-        // Re-open the popover on every new arrival so the user notices.
-        _popoverVisible.value = true
+        // Re-open the popover on every new arrival so the user notices —
+        // unless the user has muted notifications, in which case we keep
+        // the request queued silently and let them pull it up via the tray.
+        if (!_muted.value) {
+            _popoverVisible.value = true
+        }
         val result: DecisionResult
         try {
             result = deferred.await()
@@ -129,6 +143,10 @@ class PermissionRequestHolder {
 
     fun setPopoverVisible(visible: Boolean) {
         _popoverVisible.value = visible
+    }
+
+    fun toggleMuted() {
+        _muted.update { !it }
     }
 
     private fun complete(id: String, decision: Decision) {

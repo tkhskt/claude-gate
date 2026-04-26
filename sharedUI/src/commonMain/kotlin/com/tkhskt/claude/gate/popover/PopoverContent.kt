@@ -39,6 +39,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.TextStyle
@@ -93,6 +94,7 @@ fun PopoverContent(
 ) {
     val pending by holder.pending.collectAsState()
     val selectedId by holder.selectedId.collectAsState()
+    val muted by holder.muted.collectAsState()
     val selectedIndex = pending.indexOfFirst { it.id == selectedId }.coerceAtLeast(0)
     val selected = pending.getOrNull(selectedIndex) ?: pending.firstOrNull()
 
@@ -105,6 +107,8 @@ fun PopoverContent(
             TopBar(
                 projectName = projectNameOf(selected?.request),
                 sessionShort = sessionShortOf(selected?.request),
+                muted = muted,
+                onToggleMute = { holder.toggleMuted() },
                 onQuit = onQuit,
             )
             if (pending.isEmpty() || selected == null) {
@@ -134,6 +138,8 @@ fun PopoverContent(
 private fun TopBar(
     projectName: String?,
     sessionShort: String?,
+    muted: Boolean,
+    onToggleMute: () -> Unit,
     onQuit: () -> Unit,
 ) {
     Surface(
@@ -183,6 +189,14 @@ private fun TopBar(
                     }
                 }
                 Spacer(Modifier.width(12.dp))
+                IconButton(onClick = onToggleMute, size = 28.dp) {
+                    BellIcon(
+                        modifier = Modifier.size(16.dp),
+                        color = if (muted) Brand else TextSecondary,
+                        muted = muted,
+                    )
+                }
+                Spacer(Modifier.width(4.dp))
                 IconButton(onClick = onQuit, size = 28.dp) {
                     PowerIcon(modifier = Modifier.size(15.dp), color = TextSecondary)
                 }
@@ -725,6 +739,36 @@ private fun PowerIcon(modifier: Modifier, color: Color) = Canvas(modifier) {
         style = stroke,
     )
     drawLine(color, Offset(s * 0.50f, s * 0.10f), Offset(s * 0.50f, s * 0.50f), stroke.width, stroke.cap)
+}
+
+@Composable
+private fun BellIcon(modifier: Modifier, color: Color, muted: Boolean) = Canvas(modifier) {
+    val s = size.minDimension
+    val stroke = Stroke(width = s * 0.10f, cap = StrokeCap.Round)
+    // Bell body: dome curving outward to flared base, traced as a closed path
+    // so the strike-through line below it sits visually centered.
+    val body = Path().apply {
+        moveTo(s * 0.22f, s * 0.70f)
+        cubicTo(s * 0.22f, s * 0.40f, s * 0.30f, s * 0.20f, s * 0.50f, s * 0.20f)
+        cubicTo(s * 0.70f, s * 0.20f, s * 0.78f, s * 0.40f, s * 0.78f, s * 0.70f)
+    }
+    drawPath(body, color, style = stroke)
+    // Flared rim at the base
+    drawLine(color, Offset(s * 0.18f, s * 0.70f), Offset(s * 0.82f, s * 0.70f), stroke.width, stroke.cap)
+    // Clapper
+    drawLine(color, Offset(s * 0.42f, s * 0.80f), Offset(s * 0.58f, s * 0.80f), stroke.width, stroke.cap)
+    // Top knob
+    drawCircle(color, s * 0.05f, Offset(s * 0.50f, s * 0.13f))
+    if (muted) {
+        // Diagonal slash through the bell — top-left to bottom-right.
+        drawLine(
+            color,
+            Offset(s * 0.12f, s * 0.18f),
+            Offset(s * 0.88f, s * 0.86f),
+            stroke.width,
+            stroke.cap,
+        )
+    }
 }
 
 @Composable
