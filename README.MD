@@ -22,7 +22,7 @@ or AirDrop) macOS attaches a quarantine flag and Gatekeeper blocks the first
 launch — strip it after installing to `/Applications`:
 
 ```bash
-xattr -dr com.apple.quarantine /Applications/claude-gate.app
+xattr -dr com.apple.quarantine "/Applications/Claude Gate.app"
 ```
 
 Locally built `.dmg`s don't have the quarantine flag, so this step is only

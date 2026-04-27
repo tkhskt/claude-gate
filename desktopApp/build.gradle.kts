@@ -29,7 +29,7 @@ compose.desktop {
 
         nativeDistributions {
             targetFormats(TargetFormat.Dmg, TargetFormat.Msi, TargetFormat.Deb)
-            packageName = "claude-gate"
+            packageName = "Claude Gate"
             packageVersion = "1.0.0"
 
             linux {
